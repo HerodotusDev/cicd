@@ -1,0 +1,17 @@
+name: Lint GitHub Actions Workflows
+
+on:
+  pull_request:
+    paths:
+      - "./workflows/*.yaml"
+      - "./actions/**/*.yaml"
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: Validate GitHub Actions Workflows
+        uses: docker://ghcr.io/github/action-validator:latest
