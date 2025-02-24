@@ -1,0 +1,125 @@
+name: Build & deploy 
+
+on:
+  workflow_call:
+    inputs:
+      namespace:
+        required: true
+        type: string
+      app_name:
+        required: true
+        type: string
+      dockerhub_project:
+        required: true
+        type: string
+      deployment_file:
+        required: true
+        type: string
+      ingress_file:
+        required: true
+      rollout_timeout:
+        required: true
+    secrets:
+      DOCKER_USERNAME:
+        required: true
+      DOCKER__PASWORD:
+        required: true
+      GITHUB_TOKEN:
+        required: true
+      KUBE_CONFIG:
+        required: true
+
+
+permissions:
+  contents: write
+
+jobs:
+  siren:
+    runs-on: ubuntu-latest
+    if: false
+    steps:
+      - name: Log in to Docker Hub
+        uses: docker/login-action@v2
+        with:
+          username: ${{ secrets.DOCKER_USERNAME }}
+          password: ${{ secrets.DOCKER_PASSWORD }}
+
+      - name: Pull Siren Image from Registry
+        run: docker pull inputs.siren_image}
+
+      - name: Run Siren Check
+        run: |
+          docker run --rm inputs.siren_image|| exit 1
+        shell: bash
+
+  version:
+    #needs: siren
+    outputs:
+      version: ${{ steps.version.outputs.version }}
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: Extract Version
+        uses: ./.github/actions/extract-version
+        id: version
+        with:
+          file: package.json
+          version_key: .version
+          prefix_with_v: false
+
+  build-and-push-image:
+    needs: [version]
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: Build and push image
+        uses: ./.github/actions/build-and-push-image
+        with:
+          dockerhub_project: ${{ inputs.dockerhub_project }}
+          app_name: ${{ inputs.app_name }}
+          version: ${{ needs.version.outputs.version }}
+          docker_username: ${{ secrets.DOCKER_USERNAME }}
+          docker_password: ${{ secrets.DOCKER_PASSWORD }}
+
+  create-git-tag:
+    needs: [version, build-and-push-image]
+    runs-on: ubuntu-latest
+    steps:
+      - name: Create Git tag
+        uses: actions/github-script@v7.0.1
+        env:
+          VERSION: ${{ needs.version.outputs.version }}
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          script: |
+            const version = process.env.VERSION;
+            github.rest.git.createRef({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              ref: `refs/tags/${version}`,
+              sha: context.sha
+            });
+
+  deploy-staging:
+    needs: [version, create-git-tag, build-and-push-image]
+    runs-on: ubuntu-latest
+    if: always()
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: Deploy to Kubernetes
+        uses: ./.github/actions/deploy-to-k8s
+        with:
+          kube_config: ${{ secrets.KUBE_CONFIG }}
+          namespace: ${{ inputs.app_name }}
+          deployment_file: ${{ inputs.deployment_file }}
+          ingress_file: ${{ inputs.ingress_file }}
+          rollout_timeout: ${{ inputs.rollout_timeout }}
+          image_tag: ${{ needs.version.outputs.version }}
+          dockerhub_project: ${{ inputs.dockerhub_project }}
+          app_name: ${{ inputs.app_name }}

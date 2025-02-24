@@ -1,0 +1,40 @@
+name: "Render manifests"
+description: "Renders k8s manifest from templates using given value file."
+
+inputs:
+  values:
+    description: "File containing values to render the manifest"
+    required: true
+
+outputs:
+  version:
+    description: "The extracted version."
+    value: ${{ steps.extract_version.outputs.version }}
+
+runs:
+  using: "composite"
+  steps:
+  - name: Checkout Repository
+    uses: actions/checkout@v4
+
+  - name: Install Jinja2 CLI
+    run: |
+      pip install jinja-cli pyyaml
+    shell: bash
+
+  - name: Render Kubernetes Manifests
+    run: |
+      mkdir -p rendered
+      for template in templates/*.yaml; do
+        output_file="rendered/$(basename "$template")"
+        jinja2 "$template" -D values={{ inputs.values }} > "$output_file"
+      done
+    shell: bash      
+
+
+  - name: Upload Generated Manifests
+    uses: actions/upload-artifact@v4
+    with:
+      name: k8s-manifests
+      path: rendered/
+
