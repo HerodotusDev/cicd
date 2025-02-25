@@ -48,7 +48,7 @@ jobs:
 
       - name: Load Inputs from YAML
         id: load-inputs
-        uses: HerodotusDev/cicd/.github/actions/load-input@main
+        uses: HerodotusDev/cicd/.github/actions/load-inputs@main
         with:
           inputs_file: ${{ inputs.inputs_file }}
 
