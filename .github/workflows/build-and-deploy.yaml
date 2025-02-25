@@ -51,7 +51,7 @@ jobs:
 
       - name: Load Inputs from YAML
         id: load-vars
-        uses: ./actions/load-inputs
+        uses: ./.github/actions/load-inputs
         with:
           file: ${{ inputs.inputs_file }}
 
@@ -84,7 +84,7 @@ jobs:
         uses: actions/checkout@v4
 
       - name: Extract Version
-        uses: ./actions/extract-version
+        uses: ./.github/actions/extract-version
         id: version
         with:
           file: package.json
@@ -99,7 +99,7 @@ jobs:
         uses: actions/checkout@v4
 
       - name: Build and push image
-        uses: ./actions/build-and-push-image
+        uses: ./.github/actions/build-and-push-image
         with:
           dockerhub_project: ${{ inputs.dockerhub_project }}
           app_name: ${{ inputs.app_name }}
