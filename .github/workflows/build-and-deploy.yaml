@@ -48,7 +48,7 @@ jobs:
 
       - name: Load Inputs from YAML
         id: load-inputs
-        uses: HerodotusDev/cicd/.github/actions/load-inputs
+        uses: HerodotusDev/cicd/.github/actions/load-input@main
         with:
           inputs_file: ${{ inputs.inputs_file }}
 
@@ -81,7 +81,7 @@ jobs:
         uses: actions/checkout@v4
 
       - name: Extract Version
-        uses: HerodotusDev/cicd/.github/actions/extract-version
+        uses: HerodotusDev/cicd/.github/actions/extract-version@main
         id: version
         with:
           file: package.json
@@ -96,7 +96,7 @@ jobs:
         uses: actions/checkout@v4
 
       - name: Build and push image
-        uses: HerodotusDev/cicd/.github/actions/build-and-push-image
+        uses: HerodotusDev/cicd/.github/actions/build-and-push-image@main
         with:
           dockerhub_project: ${{ inputs.dockerhub_project }}
           app_name: ${{ inputs.app_name }}
@@ -132,7 +132,7 @@ jobs:
         uses: actions/checkout@v4
 
       - name: Deploy to Kubernetes
-        uses: HerodotusDev/cicd/.github/actions/deploy-to-k8s
+        uses: HerodotusDev/cicd/.github/actions/deploy-to-k8s@main
         with:
           kube_config: ${{ secrets.KUBE_CONFIG }}
           namespace: ${{ inputs.app_name }}
