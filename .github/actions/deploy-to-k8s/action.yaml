@@ -75,6 +75,6 @@ runs:
 
     - name: Wait for deployment rollout
       run: |
-        kubectl rollout status deployment/"${{ inputs.app_name }}" --namespace "${{ inputs.namespace }}" --timeout="${{ inputs.rollout_timeout }}"
+        kubectl rollout status deployment/"${{ inputs.app_name }}" --namespace "${{ inputs.namespace }}" --timeout=${{ inputs.rollout_timeout }}s
 
       shell: bash
