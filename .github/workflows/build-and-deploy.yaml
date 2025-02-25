@@ -49,12 +49,13 @@ jobs:
 #          repository: ${{ github.repository }}  # ✅ Pull the repository that triggered the workflow
 #          ref: ${{ github.ref }}  # ✅ Check out the same branch as the trigger
 #          token: ${{ secrets.GITHUB_TOKEN }}  # ✅ Use GitHub token for access
+#          path: caller_repo
 #        
 #      - name: Load Inputs from YAML
 #        id: load-inputs
 #        uses: HerodotusDev/cicd/.github/actions/load-inputs@main
 #        with:
-#          inputs_file: ${{ inputs.inputs_file }}
+#          inputs_file: caller_repo/${{ inputs.inputs_file }}
 
 
   siren:
@@ -87,6 +88,7 @@ jobs:
           repository: ${{ github.repository }}  # ✅ Pull the repository that triggered the workflow
           ref: ${{ github.ref }}  # ✅ Check out the same branch as the trigger
           token: ${{ secrets.GITHUB_TOKEN }}  # ✅ Use GitHub token for access
+          path: caller_repo
 
       - name: Extract Version
         uses: HerodotusDev/cicd/.github/actions/extract-version@main
@@ -106,6 +108,7 @@ jobs:
           repository: ${{ github.repository }}  # ✅ Pull the repository that triggered the workflow
           ref: ${{ github.ref }}  # ✅ Check out the same branch as the trigger
           token: ${{ secrets.GITHUB_TOKEN }}  # ✅ Use GitHub token for access
+          path: caller_repo
 
       - name: Build and push image
         uses: HerodotusDev/cicd/.github/actions/build-and-push-image@main
@@ -152,8 +155,8 @@ jobs:
         with:
           kube_config: ${{ secrets.KUBE_CONFIG }}
           namespace: ${{ inputs.app_name }}
-          deployment_file: ${{ inputs.deployment_file }}
-          ingress_file: ${{ inputs.ingress_file }}
+          deployment_file: caller_repo/${{ inputs.deployment_file }}
+          ingress_file: caller_repo/${{ inputs.ingress_file }}
           rollout_timeout: ${{ inputs.rollout_timeout }}
           image_tag: ${{ needs.version.outputs.version }}
           dockerhub_project: ${{ inputs.dockerhub_project }}
