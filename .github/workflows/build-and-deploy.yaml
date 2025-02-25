@@ -154,7 +154,7 @@ jobs:
         uses: HerodotusDev/cicd/.github/actions/deploy-to-k8s@main
         with:
           kube_config: ${{ secrets.KUBE_CONFIG }}
-          namespace: ${{ inputs.app_name }}
+          namespace: ${{ inputs.namespace }}
           deployment_file: ${{ inputs.deployment_file }}
           ingress_file: ${{ inputs.ingress_file }}
           rollout_timeout: ${{ inputs.rollout_timeout }}
