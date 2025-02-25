@@ -22,7 +22,7 @@ on:
     secrets:
       DOCKER_USERNAME:
         required: true
-      DOCKER__PASWORD:
+      DOCKER_PASWORD:
         required: true
       GITHUB_TOKEN:
         required: true
