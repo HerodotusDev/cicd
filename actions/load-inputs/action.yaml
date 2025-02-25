@@ -1,0 +1,39 @@
+name: "Load YAML Inputs as Environment Variables"
+description: "Parses a YAML file and sets all key-value pairs as environment variables."
+
+
+inputs:
+  file:
+    description: "Path to the YAML file containing inputs"
+    required: true
+    default: "workflow-inputs.yaml"
+
+outputs:
+  env_vars:
+    description: "Serialized key-value pairs from the YAML file"
+    value: ${{ steps.export-envs.outputs.env_vars }}
+
+runs:
+  using: "composite"
+  steps:
+    - name: Install yq (YAML parser)
+      run: |
+        sudo apt update && sudo apt install -y jq
+        wget https://github.com/mikefarah/yq/releases/latest/download/yq_linux_amd64 -O /usr/local/bin/yq
+        chmod +x /usr/local/bin/yq
+      shell: bash
+
+    - name: Load Inputs Dynamically from YAML
+      id: export-envs
+      run: |
+        if [ ! -f "${{ inputs.file }}" ]; then
+          echo "❌ Error: File ${{ inputs.file }} not found!"
+          exit 1
+        fi
+
+        echo "✅ Parsing YAML and exporting variables..."
+        ENV_VARS=$(yq -r 'to_entries | map("\(.key)=\(.value)") | join(" ")' "${{ inputs.file }}")
+        
+        # Store in outputs so other jobs can use it
+        echo "env_vars=$ENV_VARS" >> $GITHUB_OUTPUT
+      shell: bash

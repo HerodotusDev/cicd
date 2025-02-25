@@ -16,9 +16,14 @@ on:
         required: true
         type: string
       ingress_file:
+        type: string
         required: true
       rollout_timeout:
+        type: string
         required: true
+      inputs_file:
+        type: string
+        required: true  
     secrets:
       DOCKER_USERNAME:
         required: true
@@ -34,6 +39,23 @@ permissions:
   contents: write
 
 jobs:
+
+
+  load-envs:
+    runs-on: ubuntu-latest
+    outputs:
+      env_vars: ${{ steps.load-vars.outputs.env_vars }}
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: Load Inputs from YAML
+        id: load-vars
+        uses: ./actions/load-inputs
+        with:
+          file: ${{ inputs.inputs_file }}
+
+
   siren:
     runs-on: ubuntu-latest
     if: false
@@ -62,12 +84,12 @@ jobs:
         uses: actions/checkout@v4
 
       - name: Extract Version
-        uses: ./.github/actions/extract-version
+        uses: ./actions/extract-version
         id: version
         with:
           file: package.json
           version_key: .version
-          prefix_with_v: false
+          prefix_with_v: false     
 
   build-and-push-image:
     needs: [version]
@@ -77,7 +99,7 @@ jobs:
         uses: actions/checkout@v4
 
       - name: Build and push image
-        uses: ./.github/actions/build-and-push-image
+        uses: ./actions/build-and-push-image
         with:
           dockerhub_project: ${{ inputs.dockerhub_project }}
           app_name: ${{ inputs.app_name }}
@@ -113,7 +135,7 @@ jobs:
         uses: actions/checkout@v4
 
       - name: Deploy to Kubernetes
-        uses: ./.github/actions/deploy-to-k8s
+        uses: ./actions/deploy-to-k8s
         with:
           kube_config: ${{ secrets.KUBE_CONFIG }}
           namespace: ${{ inputs.app_name }}
