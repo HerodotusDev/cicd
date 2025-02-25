@@ -38,23 +38,23 @@ permissions:
 
 jobs:
 
-  load-inputs:
-    runs-on: ubuntu-latest
-    outputs:
-      env_vars: ${{ steps.load-inputs.outputs.env_vars }}
-    steps:
-      - name: Checkout Caller Repository
-        uses: actions/checkout@v4
-        with:
-          repository: ${{ github.repository }}  # ✅ Pull the repository that triggered the workflow
-          ref: ${{ github.ref }}  # ✅ Check out the same branch as the trigger
-          token: ${{ secrets.GITHUB_TOKEN }}  # ✅ Use GitHub token for access
-        
-      - name: Load Inputs from YAML
-        id: load-inputs
-        uses: HerodotusDev/cicd/.github/actions/load-inputs@main
-        with:
-          inputs_file: ${{ inputs.inputs_file }}
+#  load-inputs:
+#    runs-on: ubuntu-latest
+#    outputs:
+#      env_vars: ${{ steps.load-inputs.outputs.env_vars }}
+#    steps:
+#      - name: Checkout Caller Repository
+#        uses: actions/checkout@v4
+#        with:
+#          repository: ${{ github.repository }}  # ✅ Pull the repository that triggered the workflow
+#          ref: ${{ github.ref }}  # ✅ Check out the same branch as the trigger
+#          token: ${{ secrets.GITHUB_TOKEN }}  # ✅ Use GitHub token for access
+#        
+#      - name: Load Inputs from YAML
+#        id: load-inputs
+#        uses: HerodotusDev/cicd/.github/actions/load-inputs@main
+#        with:
+#          inputs_file: ${{ inputs.inputs_file }}
 
 
   siren:
@@ -76,7 +76,7 @@ jobs:
         shell: bash
 
   version:
-    needs: load-inputs
+  #  needs: load-inputs
     outputs:
       version: ${{ steps.version.outputs.version }}
     runs-on: ubuntu-latest
@@ -97,7 +97,7 @@ jobs:
           prefix_with_v: false     
 
   build-and-push-image:
-    needs: [version, load-inputs]
+    needs: [version]
     runs-on: ubuntu-latest
     steps:
       - name: Checkout Caller Repository
@@ -117,7 +117,7 @@ jobs:
           docker_password: ${{ secrets.DOCKER_PASSWORD }}
 
   create-git-tag:
-    needs: [version, build-and-push-image, load-inputs]
+    needs: [version, build-and-push-image]
     runs-on: ubuntu-latest
     steps:
       - name: Create Git tag
@@ -136,7 +136,7 @@ jobs:
             });
 
   deploy-staging:
-    needs: [version, create-git-tag, build-and-push-image, load-inputs]
+    needs: [version, create-git-tag, build-and-push-image]
     runs-on: ubuntu-latest
     if: always()
     steps:
