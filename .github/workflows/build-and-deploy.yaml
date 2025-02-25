@@ -21,7 +21,7 @@ on:
       rollout_timeout:
         type: string
         required: false
-        default: 300
+        default: "300"
       inputs_file:
         type: string
         required: false  
