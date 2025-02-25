@@ -3,7 +3,7 @@ description: "Parses a YAML file and sets all key-value pairs as environment var
 
 
 inputs:
-  file:
+  inputs_file:
     description: "Path to the YAML file containing inputs"
     required: true
     default: "workflow-inputs.yaml"
