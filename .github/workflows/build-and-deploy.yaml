@@ -27,7 +27,7 @@ on:
     secrets:
       DOCKER_USERNAME:
         required: true
-      DOCKER_PASWORD:
+      DOCKER_PASSWORD:
         required: true
       KUBE_CONFIG:
         required: true
