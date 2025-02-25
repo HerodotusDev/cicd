@@ -75,7 +75,7 @@ jobs:
         shell: bash
 
   version:
-    #needs: siren
+    needs: load-envs
     outputs:
       version: ${{ steps.version.outputs.version }}
     runs-on: ubuntu-latest
@@ -92,7 +92,7 @@ jobs:
           prefix_with_v: false     
 
   build-and-push-image:
-    needs: [version]
+    needs: [version, load-envs]
     runs-on: ubuntu-latest
     steps:
       - name: Checkout Repository
@@ -108,7 +108,7 @@ jobs:
           docker_password: ${{ secrets.DOCKER_PASSWORD }}
 
   create-git-tag:
-    needs: [version, build-and-push-image]
+    needs: [version, build-and-push-image, load-envs]
     runs-on: ubuntu-latest
     steps:
       - name: Create Git tag
@@ -127,7 +127,7 @@ jobs:
             });
 
   deploy-staging:
-    needs: [version, create-git-tag, build-and-push-image]
+    needs: [version, create-git-tag, build-and-push-image, load-envs]
     runs-on: ubuntu-latest
     if: always()
     steps:
