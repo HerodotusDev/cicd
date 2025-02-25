@@ -26,13 +26,13 @@ runs:
     - name: Load Inputs Dynamically from YAML
       id: export-envs
       run: |
-        if [ ! -f "${{ inputs.file }}" ]; then
-          echo "❌ Error: File ${{ inputs.file }} not found!"
+        if [ ! -f "${{ inputs.inputs_file }}" ]; then
+          echo "❌ Error: File ${{ inputs.inputs_file }} not found!"
           exit 1
         fi
 
         echo "✅ Parsing YAML and exporting variables..."
-        ENV_VARS=$(yq -r 'to_entries | map("\(.key)=\(.value)") | join(" ")' "${{ inputs.file }}")
+        ENV_VARS=$(yq -r 'to_entries | map("\(.key)=\(.value)") | join(" ")' "${{ inputs.inputs_file }}")
         
         # Store in outputs so other jobs can use it
         echo "env_vars=$ENV_VARS" >> $GITHUB_OUTPUT
