@@ -4,26 +4,26 @@ on:
   workflow_call:
     inputs:
       namespace:
-        required: true
+        required: false
         type: string
       app_name:
-        required: true
+        required: false
         type: string
       dockerhub_project:
-        required: true
+        required: false
         type: string
       deployment_file:
-        required: true
+        required: false
         type: string
       ingress_file:
         type: string
-        required: true
+        required: false
       rollout_timeout:
         type: string
-        required: true
+        required: false
       inputs_file:
         type: string
-        required: true  
+        required: false  
     secrets:
       DOCKER_USERNAME:
         required: true
