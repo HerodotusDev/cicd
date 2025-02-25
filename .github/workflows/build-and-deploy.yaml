@@ -24,6 +24,7 @@ on:
       inputs_file:
         type: string
         required: false  
+        default: inputs.yaml
     secrets:
       DOCKER_USERNAME:
         required: true
@@ -38,24 +39,23 @@ permissions:
 
 jobs:
 
-#  load-inputs:
-#    runs-on: ubuntu-latest
-#    outputs:
-#      env_vars: ${{ steps.load-inputs.outputs.env_vars }}
-#    steps:
-#      - name: Checkout Caller Repository
-#        uses: actions/checkout@v4
-#        with:
-#          repository: ${{ github.repository }}  # ✅ Pull the repository that triggered the workflow
-#          ref: ${{ github.ref }}  # ✅ Check out the same branch as the trigger
-#          token: ${{ secrets.GITHUB_TOKEN }}  # ✅ Use GitHub token for access
-#          path: caller_repo
-#        
-#      - name: Load Inputs from YAML
-#        id: load-inputs
-#        uses: HerodotusDev/cicd/.github/actions/load-inputs@main
-#        with:
-#          inputs_file: caller_repo/${{ inputs.inputs_file }}
+  load-inputs:
+    runs-on: ubuntu-latest
+    outputs:
+      env_vars: ${{ steps.load-inputs.outputs.env_vars }}
+    steps:
+      - name: Checkout Caller Repository
+        uses: actions/checkout@v4
+        with:
+          repository: ${{ github.repository }}  # ✅ Pull the repository that triggered the workflow
+          ref: ${{ github.ref }}  # ✅ Check out the same branch as the trigger
+          token: ${{ secrets.GITHUB_TOKEN }}  # ✅ Use GitHub token for access
+        
+      - name: Load Inputs from YAML
+        id: load-inputs
+        uses: HerodotusDev/cicd/.github/actions/load-inputs@main
+        with:
+          inputs_file: ${{ inputs.inputs_file }}
 
 
   siren:
@@ -154,8 +154,7 @@ jobs:
         with:
           kube_config: ${{ secrets.KUBE_CONFIG }}
           namespace: ${{ inputs.app_name }}
-          #deployment_file: ${{ inputs.deployment_file }}
-          deployment_file: k8s/deployment.yaml
+          deployment_file: ${{ inputs.deployment_file }}
           ingress_file: ${{ inputs.ingress_file }}
           rollout_timeout: ${{ inputs.rollout_timeout }}
           image_tag: ${{ needs.version.outputs.version }}
