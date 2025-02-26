@@ -20,10 +20,6 @@ on:
         type: string
         required: false
         default: "./k8s/ingress.yaml"        
-      rollout_timeout:
-        type: string
-        required: false
-        default: "300"
       inputs_file:
         type: string
         required: false  

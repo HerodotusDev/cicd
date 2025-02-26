@@ -3,24 +3,13 @@ name: Build & deploy
 on:
   workflow_call:
     inputs:
-      namespace:
+      version:
+        description: "Enter version to be deployed"
         required: true
         type: string
-      app_name:
-        required: true
+      inputs_file:
         type: string
-      dockerhub_project:
-        required: true
-        type: string
-      deployment_file:
-        required: true
-        type: string
-      ingress_file:
-        required: true
-      rollout_timeout:
-        required: true
-      version: 
-        required: true
+        default: inputs.yaml  
     secrets:
       KUBE_CONFIG:
         required: true
@@ -30,22 +19,50 @@ permissions:
   contents: write
 
 jobs:
+
+  load-inputs:
+    runs-on: ubuntu-latest
+    outputs:
+      env_vars: ${{ steps.load-inputs.outputs.env_vars }}
+    steps:
+      - name: Checkout Caller Repository
+        uses: actions/checkout@v4
+        with:
+          repository: ${{ github.repository }}  # ✅ Pull the repository that triggered the workflow
+          ref: ${{ github.ref }}  # ✅ Check out the same branch as the trigger
+          token: ${{ secrets.GITHUB_TOKEN }}  # ✅ Use GitHub token for access
+        
+      - name: Load Inputs from YAML
+        id: load-inputs
+        uses: HerodotusDev/cicd/.github/actions/load-inputs@main
+        with:
+          inputs_file: ${{ inputs.inputs_file }}
+
   deploy-staging:
-    needs: [version, create-git-tag, build-and-push-image]
     runs-on: ubuntu-latest
     if: always()
     steps:
-      - name: Checkout Repository
+
+      - name: Set inputs
+        uses: HerodotusDev/cicd/.github/actions/set-inputs@main
+        with:
+          inputs_data: ${{ needs.load-inputs.outputs.env_vars }}
+
+      - name: Checkout Caller Repository
         uses: actions/checkout@v4
+        with:
+          repository: ${{ github.repository }}  # ✅ Pull the repository that triggered the workflow
+          ref: ${{ github.ref }}  # ✅ Check out the same branch as the trigger
+          token: ${{ secrets.GITHUB_TOKEN }}  # ✅ Use GitHub token for access
 
       - name: Deploy to Kubernetes
-        uses: ./.github/actions/deploy-to-k8s
+        uses: HerodotusDev/cicd/.github/actions/deploy-to-k8s@main
         with:
           kube_config: ${{ secrets.KUBE_CONFIG }}
-          namespace: ${{ inputs.app_name }}
-          deployment_file: ${{ inputs.deployment_file }}
+          namespace: ${{ env.namespace }}
+          deployment_file: ${{ env.deployment_file }}
           ingress_file: ${{ inputs.ingress_file }}
-          rollout_timeout: ${{ inputs.rollout_timeout }}
+          rollout_timeout: ${{ env.rollout_timeout }}
           image_tag: ${{ inputs.version }}
-          dockerhub_project: ${{ inputs.dockerhub_project }}
-          app_name: ${{ inputs.app_name }}
+          dockerhub_project: ${{ env.dockerhub_project }}
+          app_name: ${{ env.app_name }}
