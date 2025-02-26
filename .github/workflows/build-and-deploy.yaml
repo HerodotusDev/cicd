@@ -112,10 +112,10 @@ jobs:
     runs-on: ubuntu-latest
     steps:
 
-      - name: Parse and Set Environment Variables
-        run: |
-          echo "Parsing environment variables..."
-          echo '${{ needs.load-inputs.outputs.env_vars }}' | jq -r 'to_entries | .[] | "\(.key)=\(.value)"' >> $GITHUB_ENV      
+    #  - name: Parse and Set Environment Variables
+    #    run: |
+    #      echo "Parsing environment variables..."
+    #      echo '${{ needs.load-inputs.outputs.env_vars }}' | jq -r 'to_entries | .[] | "\(.key)=\(.value)"' >> $GITHUB_ENV      
 
       - name: Checkout Caller Repository
         uses: actions/checkout@v4
