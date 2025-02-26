@@ -127,8 +127,8 @@ jobs:
       - name: Build and push image
         uses: HerodotusDev/cicd/.github/actions/build-and-push-image@main
         with:
-          dockerhub_project: ${{ inputs.dockerhub_project }}
-          app_name: ${{ inputs.app_name }}
+          dockerhub_project: ${{ env.dockerhub_project }}
+          app_name: ${{ env.app_name }}
           version: ${{ needs.version.outputs.version }}
           docker_username: ${{ secrets.DOCKER_USERNAME }}
           docker_password: ${{ secrets.DOCKER_PASSWORD }}
@@ -168,7 +168,7 @@ jobs:
         run: |
           echo "Parsing environment variables..."
           echo '${{ needs.load-inputs.outputs.env_vars }}' | jq -r 'to_entries | .[] | "\(.key)=\(.value)"' >> $GITHUB_ENV      
-                
+
       - name: Checkout Caller Repository
         uses: actions/checkout@v4
         with:
