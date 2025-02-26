@@ -80,13 +80,17 @@ jobs:
         shell: bash
 
   version:
-    needs: load-inputs
-    env:
-      ${{ fromJson(needs.load-inputs.outputs.env_vars) }}    
+    needs: load-inputs  
     outputs:
       version: ${{ steps.version.outputs.version }}
     runs-on: ubuntu-latest
     steps:
+
+      - name: Parse and Set Environment Variables
+        run: |
+          echo "Parsing environment variables..."
+          echo '${{ needs.load-inputs.outputs.env_vars }}' | jq -r 'to_entries | .[] | "\(.key)=\(.value)"' >> $GITHUB_ENV      
+
       - name: Checkout Caller Repository
         uses: actions/checkout@v4
         with:
@@ -106,9 +110,13 @@ jobs:
   build-and-push-image:
     needs: [version, load-inputs]
     runs-on: ubuntu-latest
-    env:
-      ${{ fromJson(needs.load-inputs.outputs.env_vars) }}    
     steps:
+
+      - name: Parse and Set Environment Variables
+        run: |
+          echo "Parsing environment variables..."
+          echo '${{ needs.load-inputs.outputs.env_vars }}' | jq -r 'to_entries | .[] | "\(.key)=\(.value)"' >> $GITHUB_ENV      
+
       - name: Checkout Caller Repository
         uses: actions/checkout@v4
         with:
@@ -127,10 +135,14 @@ jobs:
 
   create-git-tag:
     needs: [version, build-and-push-image, load-inputs]
-    runs-on: ubuntu-latest
-    env:
-      ${{ fromJson(needs.load-inputs.outputs.env_vars) }}    
+    runs-on: ubuntu-latest 
     steps:
+
+      - name: Parse and Set Environment Variables
+        run: |
+          echo "Parsing environment variables..."
+          echo '${{ needs.load-inputs.outputs.env_vars }}' | jq -r 'to_entries | .[] | "\(.key)=\(.value)"' >> $GITHUB_ENV      
+
       - name: Create Git tag
         uses: actions/github-script@v7.0.1
         env:
@@ -148,11 +160,15 @@ jobs:
 
   deploy-staging:
     needs: [version, create-git-tag, build-and-push-image, load-inputs]
-    env:
-      ${{ fromJson(needs.load-inputs.outputs.env_vars) }}    
     runs-on: ubuntu-latest
     if: always()
     steps:
+
+      - name: Parse and Set Environment Variables
+        run: |
+          echo "Parsing environment variables..."
+          echo '${{ needs.load-inputs.outputs.env_vars }}' | jq -r 'to_entries | .[] | "\(.key)=\(.value)"' >> $GITHUB_ENV      
+                
       - name: Checkout Caller Repository
         uses: actions/checkout@v4
         with:

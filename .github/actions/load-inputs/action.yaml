@@ -32,11 +32,14 @@ runs:
         fi
 
         echo "✅ Parsing YAML and exporting variables..."
-        ENV_VARS=$(yq -r 'to_entries | map("\(.key)=\(.value)") | join(" ")' "${{ inputs.inputs_file }}")
         
-        # Store in outputs so other jobs can use it
-        echo "env_vars=$ENV_VARS" >> $GITHUB_OUTPUT
+        # Convert YAML to JSON and store in output
+        JSON_OUTPUT=$(yq -o=json '.' "${{ inputs.inputs_file }}" | jq -c)
+
+        # Store JSON output for use in following jobs
+        echo "env_vars=$JSON_OUTPUT" >> "$GITHUB_OUTPUT"
 
         echo "✅ Loaded input variables:"
-        echo "$ENV_VARS"
+        echo "$JSON_OUTPUT"
       shell: bash
+
