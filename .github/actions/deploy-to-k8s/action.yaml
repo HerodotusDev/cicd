@@ -11,15 +11,13 @@ inputs:
   deployment_file:
     description: "Path to the deployment YAML file."
     required: true
-    default: "./k8s/deployment.yaml"
   ingress_file:
     description: "Path to the ingress YAML file."
     required: true
-    default: "./k8s/ingress.yaml"
   rollout_timeout:
     description: "Rollout timeout for the deployment (e.g., 500s)."
     required: false
-    default: "500s"
+    default: "500"
   image_tag:
     description: "Image tag to deployed."
     required: true
