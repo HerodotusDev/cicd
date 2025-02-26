@@ -180,10 +180,10 @@ jobs:
         uses: HerodotusDev/cicd/.github/actions/deploy-to-k8s@main
         with:
           kube_config: ${{ secrets.KUBE_CONFIG }}
-          namespace: ${{ inputs.namespace }}
-          deployment_file: ${{ inputs.deployment_file }}
+          namespace: ${{ env.namespace }}
+          deployment_file: ${{ env.deployment_file }}
           ingress_file: ${{ inputs.ingress_file }}
-          rollout_timeout: ${{ inputs.rollout_timeout }}
-          image_tag: ${{ needs.version.outputs.version }}
-          dockerhub_project: ${{ inputs.dockerhub_project }}
-          app_name: ${{ inputs.app_name }}
+          rollout_timeout: ${{ env.rollout_timeout }}
+          image_tag: ${{ env.version.outputs.version }}
+          dockerhub_project: ${{ env.dockerhub_project }}
+          app_name: ${{ env.app_name }}
