@@ -7,6 +7,6 @@ runs:
   - name: Parse and Set Environment Variables
     run: |
       echo "Parsing environment variables..."
-      echo '${{ needs.load-inputs.outputs.env_vars }}' | jq -r 'to_entries | .[] | "\(.key)=\(.value)"' >> $GITHUB_ENV    
+      echo '${{ inputs.inputs_data }}' | jq -r 'to_entries | .[] | "\(.key)=\(.value)"' >> $GITHUB_ENV    
     shell: bash
 

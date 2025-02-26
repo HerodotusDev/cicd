@@ -86,10 +86,10 @@ jobs:
     runs-on: ubuntu-latest
     steps:
 
-      - name: Parse and Set Environment Variables
-        run: |
-          echo "Parsing environment variables..."
-          echo '${{ needs.load-inputs.outputs.env_vars }}' | jq -r 'to_entries | .[] | "\(.key)=\(.value)"' >> $GITHUB_ENV      
+      - name: Set inputs
+        uses: HerodotusDev/cicd/.github/actions/set-inputs@main
+        with:
+          inputs_data: ${{ needs.load-inputs.outputs.env_vars }} 
 
       - name: Checkout Caller Repository
         uses: actions/checkout@v4
@@ -112,8 +112,10 @@ jobs:
     runs-on: ubuntu-latest
     steps:
 
-      - name: Checkout Caller Repository
+      - name: Set inputs
         uses: HerodotusDev/cicd/.github/actions/set-inputs@main
+        with:
+          inputs_data: ${{ needs.load-inputs.outputs.env_vars }}
 
       - name: Checkout Caller Repository
         uses: actions/checkout@v4
@@ -136,10 +138,10 @@ jobs:
     runs-on: ubuntu-latest 
     steps:
 
-      - name: Parse and Set Environment Variables
-        run: |
-          echo "Parsing environment variables..."
-          echo '${{ needs.load-inputs.outputs.env_vars }}' | jq -r 'to_entries | .[] | "\(.key)=\(.value)"' >> $GITHUB_ENV      
+      - name: Set inputs
+        uses: HerodotusDev/cicd/.github/actions/set-inputs@main
+        with:
+          inputs_data: ${{ needs.load-inputs.outputs.env_vars }}
 
       - name: Create Git tag
         uses: actions/github-script@v7.0.1
@@ -162,10 +164,10 @@ jobs:
     if: always()
     steps:
 
-      - name: Parse and Set Environment Variables
-        run: |
-          echo "Parsing environment variables..."
-          echo '${{ needs.load-inputs.outputs.env_vars }}' | jq -r 'to_entries | .[] | "\(.key)=\(.value)"' >> $GITHUB_ENV      
+      - name: Set inputs
+        uses: HerodotusDev/cicd/.github/actions/set-inputs@main
+        with:
+          inputs_data: ${{ needs.load-inputs.outputs.env_vars }}
 
       - name: Checkout Caller Repository
         uses: actions/checkout@v4
