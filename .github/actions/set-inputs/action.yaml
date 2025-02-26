@@ -1,0 +1,12 @@
+name: "Set envs from loaded inputs"
+description: "Parses loaded inputs into github envs."
+
+runs:
+  using: "composite"
+  steps:
+  - name: Parse and Set Environment Variables
+    run: |
+      echo "Parsing environment variables..."
+      echo '${{ needs.load-inputs.outputs.env_vars }}' | jq -r 'to_entries | .[] | "\(.key)=\(.value)"' >> $GITHUB_ENV    
+    shell: bash
+
