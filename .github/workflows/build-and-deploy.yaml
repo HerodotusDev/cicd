@@ -182,8 +182,8 @@ jobs:
           kube_config: ${{ secrets.KUBE_CONFIG }}
           namespace: ${{ env.namespace }}
           deployment_file: ${{ env.deployment_file }}
-          ingress_file: ${{ inputs.ingress_file }}
+          ingress_file: ${{ env.ingress_file }}
           rollout_timeout: ${{ env.rollout_timeout }}
-          image_tag: ${{ env.version.outputs.version }}
+          image_tag: ${{ needs.version.outputs.version }}
           dockerhub_project: ${{ env.dockerhub_project }}
           app_name: ${{ env.app_name }}
