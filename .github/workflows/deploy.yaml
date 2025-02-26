@@ -1,4 +1,4 @@
-name: Build & deploy 
+name: Deploy version
 
 on:
   workflow_call:
@@ -39,6 +39,7 @@ jobs:
           inputs_file: ${{ inputs.inputs_file }}
 
   deploy-staging:
+    needs: load-inputs
     runs-on: ubuntu-latest
     if: always()
     steps:
@@ -61,7 +62,7 @@ jobs:
           kube_config: ${{ secrets.KUBE_CONFIG }}
           namespace: ${{ env.namespace }}
           deployment_file: ${{ env.deployment_file }}
-          ingress_file: ${{ inputs.ingress_file }}
+          ingress_file: ${{ env.ingress_file }}
           rollout_timeout: ${{ env.rollout_timeout }}
           image_tag: ${{ inputs.version }}
           dockerhub_project: ${{ env.dockerhub_project }}
