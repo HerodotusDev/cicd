@@ -36,4 +36,7 @@ runs:
         
         # Store in outputs so other jobs can use it
         echo "env_vars=$ENV_VARS" >> $GITHUB_OUTPUT
+
+        echo "✅ Loaded input variables:"
+        echo "$ENV_VARS"
       shell: bash
