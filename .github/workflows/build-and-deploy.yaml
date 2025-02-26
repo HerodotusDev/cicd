@@ -2,28 +2,11 @@ name: Build & deploy
 
 on:
   workflow_call:
-    inputs:
-      namespace:
-        required: false
-        type: string
-      app_name:
-        required: false
-        type: string
-      dockerhub_project:
-        required: false
-        type: string
-      deployment_file:
-        required: false
-        type: string
-        default: "./k8s/deployment.yaml"        
-      ingress_file:
-        type: string
-        required: false
-        default: "./k8s/ingress.yaml"        
+    inputs:    
       inputs_file:
         type: string
         required: false  
-        default: inputs.yaml
+        default: ./k8s/cicd-inputs.yaml
     secrets:
       DOCKER_USERNAME:
         required: true

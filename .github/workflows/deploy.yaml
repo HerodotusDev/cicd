@@ -9,11 +9,15 @@ on:
         type: string
       inputs_file:
         type: string
-        default: inputs.yaml  
+        default: ./k8s/cicd-inputs.yaml  
     secrets:
       KUBE_CONFIG:
         required: true
 
+env:
+  deployment_file: ./k8s/deployment.yaml
+  ingress_file: ./k8s/ingress.yaml
+  rollout_timeout: 300 
 
 permissions:
   contents: write
