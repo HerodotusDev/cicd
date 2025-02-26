@@ -15,7 +15,11 @@ on:
       KUBE_CONFIG:
         required: true
 
-
+env:
+  deployment_file: ./k8s/deployment.yaml
+  ingress_file: ./k8s/ingress.yaml
+  rollout_timeout: 300         
+  
 permissions:
   contents: write
 
