@@ -15,9 +15,11 @@ on:
       deployment_file:
         required: false
         type: string
+        default: "./k8s/deployment.yaml"        
       ingress_file:
         type: string
         required: false
+        default: "./k8s/ingress.yaml"        
       rollout_timeout:
         type: string
         required: false
