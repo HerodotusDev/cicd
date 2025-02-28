@@ -33,24 +33,25 @@ runs:
       run: |
         ETCD_VERSION="v3.5.5"
         curl -L https://github.com/etcd-io/etcd/releases/download/${ETCD_VERSION}/etcd-${ETCD_VERSION}-linux-amd64.tar.gz -o etcd.tar.gz
-        tar xzvf etcd.tar.gz
+        tar xzvf etcd.tar.gz > /dev/null
         sudo mv etcd-${ETCD_VERSION}-linux-amd64/etcdctl /usr/local/bin/
         rm -rf etcd.tar.gz etcd-${ETCD_VERSION}-linux-amd64
-        etcdctl version  # Verify installation
+        etcdctl version > /dev/null  # Hide output
 
     - name: Fetch ETCD Config
       id: fetch
       shell: bash
       run: |
+        # Retrieve key-value pairs from ETCD securely
         OUTPUT=$(ETCDCTL_API=3 etcdctl \
           --endpoints="${{ inputs.etcd_host }}" \
           --user "${{ inputs.etcd_user }}:${{ inputs.etcd_password }}" \
-          get "${{ inputs.etcd_key }}" --print-value-only)
+          get "${{ inputs.etcd_key }}" --print-value-only 2>/dev/null)
 
         # Hide values from GitHub logs
         echo "::add-mask::$OUTPUT"
 
-        # Store output as an action output
+        # Store secret values without printing
         echo "config_values<<EOF" >> $GITHUB_OUTPUT
         echo "$OUTPUT" >> $GITHUB_OUTPUT
         echo "EOF" >> $GITHUB_OUTPUT
@@ -72,21 +73,23 @@ runs:
         # Read fetched config values directly from output
         CONFIG_VALUES="${{ steps.fetch.outputs.config_values }}"
 
-        # Hide secret values from logs
+        # Ensure values are hidden from logs
         echo "::add-mask::$CONFIG_VALUES"
 
-        # Prepare key-value pairs for Secret
+        # Prepare key-value pairs for Secret (Base64 encode)
         SECRET_DATA=""
         while IFS='=' read -r key value; do
-          key=$(echo -n "$key" | xargs)    # Trim whitespace
-          value=$(echo -n "$value" | sed ':a;N;$!ba;s/\n/\\n/g')  # Escape newlines
+          key=$(echo -n "$key" | xargs)  # Trim whitespace
+          value=$(echo -n "$value" | base64 -w0)  # Base64 encode value
           if [[ ! -z "$key" && ! -z "$value" ]]; then
-            ENCODED_VALUE=$(echo -n "$value" | base64 -w0)  # Base64 encode value
-            SECRET_DATA+="  $key: $ENCODED_VALUE\n"
+            SECRET_DATA+="  $key: $value\n"
           fi
         done <<< "$CONFIG_VALUES"
 
-        # Create Secret YAML
+        # Ensure no output is printed
+        exec 1>/dev/null
+
+        # Create Secret YAML securely
         cat <<EOF > secret.yaml
         apiVersion: v1
         kind: Secret
@@ -98,8 +101,5 @@ runs:
         $SECRET_DATA
         EOF
 
-        # Debugging - Show formatted Secret YAML safely
-        cat secret.yaml | sed 's/: .*/: [REDACTED]/g'
-
-        # Apply Secret
-        kubectl apply -f secret.yaml
+        # Apply Secret silently
+        kubectl apply -f secret.yaml > /dev/null 2>&1
