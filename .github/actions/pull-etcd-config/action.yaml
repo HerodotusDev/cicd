@@ -28,29 +28,18 @@ inputs:
 runs:
   using: "composite"
   steps:
-    - name: Install etcdctl
-      shell: bash
+    - name: Pull and Run Secret Preparation Container
       run: |
-        ETCD_VERSION="v3.5.5"
-        curl -L https://github.com/etcd-io/etcd/releases/download/${ETCD_VERSION}/etcd-${ETCD_VERSION}-linux-amd64.tar.gz -o etcd.tar.gz
-        tar xzvf etcd.tar.gz > /dev/null
-        sudo mv etcd-${ETCD_VERSION}-linux-amd64/etcdctl /usr/local/bin/
-        rm -rf etcd.tar.gz etcd-${ETCD_VERSION}-linux-amd64
-
-    - name: Fetch ETCD Config and Store in File
+        docker run --rm \
+          -e ETCD_HOST="${{ secrets.ETCD_HOST }}" \
+          -e ETCD_USER="${{ secrets.ETCD_USER }}" \
+          -e ETCD_PASSWORD="${{ secrets.ETCD_PASSWORD }}" \
+          -e ETCD_KEY="${{ inputs.ETCD_KEY }}" \
+          -e APP_NAME="${{ inputs.app_name }}" \
+          -e NAMESPACE="${{ inputs.namespace }}" \
+          -v ${{ github.workspace }}/output:/app \
+          dataprocessor/etcd-pull:latest
       shell: bash
-      run: |
-        # Fetch key-value pairs from ETCD
-        ETCD_VALUES=$(ETCDCTL_API=3 etcdctl \
-          --endpoints="${{ inputs.etcd_host }}" \
-          --user "${{ inputs.etcd_user }}:${{ inputs.etcd_password }}" \
-          get "${{ inputs.etcd_key }}" --print-value-only 2>/dev/null)
-
-        # Store values in a temporary file
-        echo "$ETCD_VALUES" > etcd_values.env
-
-        # Secure the file (prevent logs and unauthorized access)
-        chmod 600 etcd_values.env
 
     - name: Set up kubectl
       uses: azure/setup-kubectl@v4
@@ -58,42 +47,12 @@ runs:
         version: "v1.32.0"
 
     - name: Configure kubectl
-      shell: bash
       run: |
         mkdir -p ~/.kube
-        echo "${{ inputs.kube_config }}" > ~/.kube/config
-        chmod 600 ~/.kube/config  # Secure kubeconfig
-
-    - name: Create Kubernetes Secret from File
+        echo "${{ secrets.KUBE_CONFIG }}" > ~/.kube/config
+        chmod 600 ~/.kube/config
       shell: bash
-      run: |
-        # Ensure values are never printed to logs
-        exec 1>/dev/null
 
-        # Prepare key-value pairs for Secret (Base64 encode)
-        SECRET_DATA=""
-        while IFS='=' read -r key value; do
-          key=$(echo -n "$key" | xargs)  # Trim whitespace
-          value=$(echo -n "$value" | base64 -w0)  # Base64 encode value
-          if [[ ! -z "$key" && ! -z "$value" ]]; then
-            SECRET_DATA+="  $key: $value\n"
-          fi
-        done < etcd_values.env
-
-        # Create Secret YAML file
-        cat <<EOF > secret.yaml
-        apiVersion: v1
-        kind: Secret
-        metadata:
-          name: ${{ inputs.app_name }}-secret
-          namespace: ${{ inputs.namespace }}
-        type: Opaque
-        data:
-        $SECRET_DATA
-        EOF
-
-        # Apply Secret without printing anything
-        kubectl apply -f secret.yaml > /dev/null 2>&1
-
-        # Clean up sensitive files
-        rm -f etcd_values.env secret.yaml
+    - name: Apply Kubernetes Secret
+      run: kubectl apply -f ${{ github.workspace }}/output/secret.yaml            
+      shell: bash
