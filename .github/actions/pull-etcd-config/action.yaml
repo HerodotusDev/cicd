@@ -31,7 +31,6 @@ runs:
     - name: Pull and Run Secret Preparation Container
       run: |
         docker run --rm \
-          --entrypoint="/app/"
           -e ETCD_HOST="${{ inputs.ETCD_HOST }}" \
           -e ETCD_USER="${{ inputs.ETCD_USER }}" \
           -e ETCD_PASSWORD="${{ inputs.ETCD_PASSWORD }}" \
