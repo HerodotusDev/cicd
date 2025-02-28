@@ -1,48 +1,87 @@
-name: "Fetch ETCD Config from K8s"
-description: "Fetch configuration from an ETCD instance running inside a Kubernetes cluster"
+name: 'Fetch ETCD Config and Create ConfigMap'
+description: 'Fetch configuration from an external ETCD instance and create a Kubernetes ConfigMap'
+
 inputs:
-  kube_config:
-    description: "Base64 encoded Kubernetes config"
-    required: true
-  etcd_namespace:
-    description: "Namespace where ETCD is running"
-    required: true
-  etcd_label:
-    description: "Label selector for the ETCD pod"
-    required: true
-  etcd_key:
-    description: "Key to fetch from ETCD"
+  etcd_host:
+    description: 'ETCD endpoint)'
     required: true
   etcd_user:
-    description: "ETCD username"
+    description: 'ETCD username'
     required: true
   etcd_password:
-    description: "ETCD password"
+    description: 'ETCD password'
     required: true
-outputs:
-  value:
-    description: "Value retrieved from ETCD"
-    value: ${{ steps.fetch.outputs.value }}
+  etcd_key:
+    description: 'ETCD key to fetch'
+    required: true
+  namespace:
+    description: 'Kubernetes namespace for the ConfigMap'
+    required: false
+    default: 'default'
+  app_name:
+    description: 'Its the app name'
+    required: false
 
 runs:
   using: "composite"
   steps:
-    - name: Setup kubectl
-      uses: azure/setup-kubectl@v3
-      with:
-        version: 'latest'
-
-    - name: Configure kubectl
+    - name: Install etcdctl
       shell: bash
       run: |
-        echo "${{ inputs.kube_config }}" | base64 --decode > kubeconfig.yaml
-        export KUBECONFIG=kubeconfig.yaml
+        ETCD_VERSION="v3.5.5"
+        curl -L https://github.com/etcd-io/etcd/releases/download/${ETCD_VERSION}/etcd-${ETCD_VERSION}-linux-amd64.tar.gz -o etcd.tar.gz
+        tar xzvf etcd.tar.gz
+        sudo mv etcd-${ETCD_VERSION}-linux-amd64/etcdctl /usr/local/bin/
+        rm -rf etcd.tar.gz etcd-${ETCD_VERSION}-linux-amd64
+        etcdctl version  # Verify installation
 
     - name: Fetch ETCD Config
       id: fetch
       shell: bash
       run: |
-        POD_NAME=$(kubectl get pods -n ${{ inputs.etcd_namespace }} -l ${{ inputs.etcd_label }} -o jsonpath='{.items[0].metadata.name}')
-        OUTPUT=$(kubectl exec -n ${{ inputs.etcd_namespace }} $POD_NAME -- etcdctl --user="${{ inputs.etcd_user }}:${{ inputs.etcd_password }}" get "${{ inputs.etcd_key }}" --print-value-only)
+        OUTPUT=$(ETCDCTL_API=3 etcdctl \
+          --endpoints="${{ inputs.etcd_host }}" \
+          --user "${{ inputs.etcd_user }}:${{ inputs.etcd_password }}" \
+          get "${{ inputs.etcd_key }}" --print-value-only)
+
+        echo "$OUTPUT" > etcd_values.env
+        echo "CONFIG_VALUES=$(cat etcd_values.env | base64 -w0)" >> $GITHUB_ENV  # Encode for safety
+
+    - name: Set up kubectl
+      uses: azure/setup-kubectl@v4
+      with:
+        version: "v1.32.0"
+
+    - name: Configure kubectl
+      run: |
+        mkdir -p ~/.kube
+        echo "${{ inputs.kube_config }}" > ~/.kube/config
+      shell: bash        
+
+    - name: Create ConfigMap
+      shell: bash
+      run: |
+        # Decode and store values in a temp file
+        echo "${{ env.CONFIG_VALUES }}" | base64 -d > etcd_values.env
         
-        echo "value=$OUTPUT" >> $GITHUB_OUTPUT
+        # Prepare key-value pairs for ConfigMap
+        CONFIGMAP_DATA=""
+        while IFS='=' read -r key value; do
+          if [[ ! -z "$key" && ! -z "$value" ]]; then
+            CONFIGMAP_DATA+="  $key: \"$value\"\n"
+          fi
+        done < etcd_values.env
+
+        # Create ConfigMap YAML
+        cat <<EOF > configmap.yaml
+        apiVersion: v1
+        kind: ConfigMap
+        metadata:
+          name: ${{ inputs.app_name }}-configmap
+          namespace: ${{ inputs.namespace }}
+        data:
+        $CONFIGMAP_DATA
+        EOF
+
+        # Apply ConfigMap
+        kubectl apply -f configmap.yaml

@@ -145,12 +145,24 @@ jobs:
     needs: [version, create-git-tag, build-and-push-image, load-inputs]
     runs-on: ubuntu-latest
     if: always()
-    steps:
+    steps:      
 
       - name: Set inputs
         uses: HerodotusDev/cicd/.github/actions/set-inputs@main
         with:
           inputs_data: ${{ needs.load-inputs.outputs.env_vars }}
+          
+      - name: Pull config from etcd
+        uses: HerodotusDev/cicd/.github/actions/set-inputs@feat/load-etcd-values
+        if: ${{ needs.load-inputs.outputs.env_vars.pull_etcd_config == 'true' }}
+        with:
+          kube_config: ${{ secrets.KUBE_CONFIG }}
+          namespace: ${{ env.namespace }}
+          app_name: ${{ env.app_name }}
+          etcd_host: https://config.api.herodotus.cloud:2379
+          etcd_user: ${{ secrets.ETCD_USER }}
+          etcd_password: ${{ secrets.ETCD_PASSWORD}}
+          etcd_key: ${{ env.etcd_key}}
 
       - name: Checkout Caller Repository
         uses: actions/checkout@v4
