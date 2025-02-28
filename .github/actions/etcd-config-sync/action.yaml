@@ -22,6 +22,7 @@ inputs:
     description: 'Its the app name'
     required: false
 
+
 runs:
   using: "composite"
   steps:
@@ -56,32 +57,35 @@ runs:
       run: |
         mkdir -p ~/.kube
         echo "${{ inputs.kube_config }}" > ~/.kube/config
-      shell: bash        
 
-    - name: Create ConfigMap
+      shell: bash        
+      
+    - name: Create Kubernetes Secret
       shell: bash
       run: |
         # Decode and store values in a temp file
         echo "${{ env.CONFIG_VALUES }}" | base64 -d > etcd_values.env
         
-        # Prepare key-value pairs for ConfigMap
-        CONFIGMAP_DATA=""
+        # Prepare key-value pairs for Secret
+        SECRET_DATA=""
         while IFS='=' read -r key value; do
           if [[ ! -z "$key" && ! -z "$value" ]]; then
-            CONFIGMAP_DATA+="  $key: \"$value\"\n"
+            ENCODED_VALUE=$(echo -n "$value" | base64 -w0)  # Base64 encode value
+            SECRET_DATA+="  $key: $ENCODED_VALUE\n"
           fi
         done < etcd_values.env
 
-        # Create ConfigMap YAML
-        cat <<EOF > configmap.yaml
+        # Create Secret YAML
+        cat <<EOF > secret.yaml
         apiVersion: v1
-        kind: ConfigMap
+        kind: Secret
         metadata:
-          name: ${{ inputs.app_name }}-configmap
+          name: ${{ inputs.app_name }}-secret
           namespace: ${{ inputs.namespace }}
+        type: Opaque
         data:
-        $CONFIGMAP_DATA
+        $SECRET_DATA
         EOF
 
-        # Apply ConfigMap
-        kubectl apply -f configmap.yaml
+        # Apply Secret
+        kubectl apply -f secret.yaml
