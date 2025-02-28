@@ -41,6 +41,10 @@ runs:
           dataprocessor/etcd-pull:0.1
       shell: bash
 
+    - name: Change Ownership of Output Files
+      run: sudo chown -R $(whoami):$(whoami) ${{ github.workspace }}/output
+      shell: bash
+
     - name: Set up kubectl
       uses: azure/setup-kubectl@v4
       with:
