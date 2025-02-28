@@ -49,7 +49,7 @@ runs:
           get "${{ inputs.etcd_key }}" --print-value-only)
 
         echo "$OUTPUT" > etcd_values.env
-        echo "CONFIG_VALUES=$(cat etcd_values.env | base64 -w0)" >> $GITHUB_ENV  # Encode for safety
+        echo "CONFIG_VALUES=$(cat etcd_values.env)" >> $GITHUB_ENV  # Encode for saf
 
     - name: Set up kubectl
       uses: azure/setup-kubectl@v4
