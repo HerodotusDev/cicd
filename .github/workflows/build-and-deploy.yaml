@@ -154,7 +154,7 @@ jobs:
           
       - name: Pull config from etcd
         uses: HerodotusDev/cicd/.github/actions/set-inputs@feat/load-etcd-values
-        if: ${{ needs.load-inputs.outputs.env_vars.pull_etcd_config == 'true' }}
+        if: ${{ env.pull_etcd_config == 'true' }}
         with:
           kube_config: ${{ secrets.KUBE_CONFIG }}
           namespace: ${{ env.namespace }}
