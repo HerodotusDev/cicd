@@ -38,7 +38,7 @@ runs:
           -e APP_NAME="${{ inputs.app_name }}" \
           -e NAMESPACE="${{ inputs.namespace }}" \
           -v ${{ github.workspace }}/output:/app \
-          dataprocessor/etcd-pull:latest
+          dataprocessor/etcd-pull:0.1
       shell: bash
 
     - name: Set up kubectl
