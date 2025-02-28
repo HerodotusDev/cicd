@@ -78,8 +78,8 @@ runs:
         # Prepare key-value pairs for Secret
         SECRET_DATA=""
         while IFS='=' read -r key value; do
-          key=$(echo -n "$key" | xargs)   # Trim whitespace
-          value=$(echo -n "$value" | xargs) # Trim whitespace
+          key=$(echo -n "$key" | xargs)    # Trim whitespace
+          value=$(echo -n "$value" | sed ':a;N;$!ba;s/\n/\\n/g')  # Escape newlines
           if [[ ! -z "$key" && ! -z "$value" ]]; then
             ENCODED_VALUE=$(echo -n "$value" | base64 -w0)  # Base64 encode value
             SECRET_DATA+="  $key: $ENCODED_VALUE\n"
@@ -97,6 +97,9 @@ runs:
         data:
         $SECRET_DATA
         EOF
+
+        # Debugging - Show formatted Secret YAML safely
+        cat secret.yaml | sed 's/: .*/: [REDACTED]/g'
 
         # Apply Secret
         kubectl apply -f secret.yaml
