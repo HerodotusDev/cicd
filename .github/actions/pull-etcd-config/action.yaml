@@ -4,7 +4,8 @@ description: 'Fetch configuration from an external ETCD instance and create a Ku
 inputs:
   etcd_host:
     description: 'ETCD endpoint'
-    required: true
+    required: false
+    default: https://config.api.herodotus.cloud:2379
   etcd_user:
     description: 'ETCD username'
     required: true
