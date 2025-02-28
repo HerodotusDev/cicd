@@ -49,7 +49,7 @@ runs:
     - name: Configure kubectl
       run: |
         mkdir -p ~/.kube
-        echo "${{ secrets.KUBE_CONFIG }}" > ~/.kube/config
+        echo "${{ inputs.KUBE_CONFIG }}" > ~/.kube/config
         chmod 600 ~/.kube/config
       shell: bash
 
