@@ -1,5 +1,5 @@
-name: 'Fetch ETCD Config and Create ConfigMap'
-description: 'Fetch configuration from an external ETCD instance and create a Kubernetes ConfigMap'
+name: 'Fetch ETCD Config and Create Secret'
+description: 'Fetch configuration from an external ETCD instance and create a Kubernetes Secret'
 
 inputs:
   etcd_host:
@@ -15,7 +15,7 @@ inputs:
     description: 'ETCD key to fetch'
     required: true
   namespace:
-    description: 'Kubernetes namespace for the ConfigMap'
+    description: 'Kubernetes namespace for the Secret'
     required: false
     default: 'default'
   app_name:
