@@ -14,6 +14,10 @@ on:
         required: true
       KUBE_CONFIG:
         required: true
+      ETCD_USER:
+        required: false
+      ETCD_PASSOWRD:
+        required: false
 
 env:
   deployment_file: ./k8s/deployment.yaml
@@ -168,7 +172,7 @@ jobs:
           app_name: ${{ env.app_name }}
           etcd_host: https://config.api.herodotus.cloud:2379
           etcd_user: ${{ secrets.ETCD_USER }}
-          etcd_password: ${{ secrets.ETCD_PASSWORD}}
+          etcd_password: ${{ secrets.ETCD_PASSWORD }}
           etcd_key: ${{ env.etcd_key}}
 
 
