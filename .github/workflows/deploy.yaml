@@ -13,6 +13,10 @@ on:
     secrets:
       KUBE_CONFIG:
         required: true
+        ETCD_USER:
+          required: false
+        ETCD_PASSWORD:
+          required: false        
 
 env:
   deployment_file: ./k8s/deployment.yaml
