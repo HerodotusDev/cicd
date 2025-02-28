@@ -21,6 +21,9 @@ inputs:
   app_name:
     description: 'Its the app name'
     required: false
+  kube_config:
+    description: 'Its the app name'
+    required: true
 
 
 runs:
