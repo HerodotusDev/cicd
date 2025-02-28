@@ -16,7 +16,7 @@ on:
         required: true
       ETCD_USER:
         required: false
-      ETCD_PASSOWRD:
+      ETCD_PASSWORD:
         required: false
 
 env:
