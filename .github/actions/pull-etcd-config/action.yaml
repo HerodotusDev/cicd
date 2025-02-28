@@ -36,25 +36,21 @@ runs:
         tar xzvf etcd.tar.gz > /dev/null
         sudo mv etcd-${ETCD_VERSION}-linux-amd64/etcdctl /usr/local/bin/
         rm -rf etcd.tar.gz etcd-${ETCD_VERSION}-linux-amd64
-        etcdctl version > /dev/null  # Hide output
 
-    - name: Fetch ETCD Config
-      id: fetch
+    - name: Fetch ETCD Config and Store in File
       shell: bash
       run: |
-        # Retrieve key-value pairs from ETCD securely
-        OUTPUT=$(ETCDCTL_API=3 etcdctl \
+        # Fetch key-value pairs from ETCD
+        ETCD_VALUES=$(ETCDCTL_API=3 etcdctl \
           --endpoints="${{ inputs.etcd_host }}" \
           --user "${{ inputs.etcd_user }}:${{ inputs.etcd_password }}" \
           get "${{ inputs.etcd_key }}" --print-value-only 2>/dev/null)
 
-        # Hide values from GitHub logs
-        echo "::add-mask::$OUTPUT"
+        # Store values in a temporary file
+        echo "$ETCD_VALUES" > etcd_values.env
 
-        # Store secret values without printing
-        echo "config_values<<EOF" >> $GITHUB_OUTPUT
-        echo "$OUTPUT" >> $GITHUB_OUTPUT
-        echo "EOF" >> $GITHUB_OUTPUT
+        # Secure the file (prevent logs and unauthorized access)
+        chmod 600 etcd_values.env
 
     - name: Set up kubectl
       uses: azure/setup-kubectl@v4
@@ -66,15 +62,13 @@ runs:
       run: |
         mkdir -p ~/.kube
         echo "${{ inputs.kube_config }}" > ~/.kube/config
+        chmod 600 ~/.kube/config  # Secure kubeconfig
 
-    - name: Create Kubernetes Secret
+    - name: Create Kubernetes Secret from File
       shell: bash
       run: |
-        # Read fetched config values directly from output
-        CONFIG_VALUES="${{ steps.fetch.outputs.config_values }}"
-
-        # Ensure values are hidden from logs
-        echo "::add-mask::$CONFIG_VALUES"
+        # Ensure values are never printed to logs
+        exec 1>/dev/null
 
         # Prepare key-value pairs for Secret (Base64 encode)
         SECRET_DATA=""
@@ -84,12 +78,9 @@ runs:
           if [[ ! -z "$key" && ! -z "$value" ]]; then
             SECRET_DATA+="  $key: $value\n"
           fi
-        done <<< "$CONFIG_VALUES"
+        done < etcd_values.env
 
-        # Ensure no output is printed
-        exec 1>/dev/null
-
-        # Create Secret YAML securely
+        # Create Secret YAML file
         cat <<EOF > secret.yaml
         apiVersion: v1
         kind: Secret
@@ -101,5 +92,8 @@ runs:
         $SECRET_DATA
         EOF
 
-        # Apply Secret silently
+        # Apply Secret without printing anything
         kubectl apply -f secret.yaml > /dev/null 2>&1
+
+        # Clean up sensitive files
+        rm -f etcd_values.env secret.yaml
