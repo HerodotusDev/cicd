@@ -38,7 +38,7 @@ APP_NAME_CLEAN=$(echo -n "$APP_NAME" | xargs)
 NAMESPACE_CLEAN=$(echo -n "$NAMESPACE" | xargs)
 
 # Generate Secret YAML
-cat > /app/secret.yaml <<EOF
+cat > /output/secret.yaml <<EOF
 apiVersion: v1
 kind: Secret
 metadata:
@@ -49,4 +49,4 @@ data:
 $(echo -e "$SECRET_DATA" | sed 's/^/  /')  # Fix: Correct YAML indentation
 EOF
 
-echo "✅ Secret manifest created successfully: /app/secret.yaml"
+echo "✅ Secret manifest created successfully: /output/secret.yaml"
