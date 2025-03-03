@@ -131,19 +131,10 @@ jobs:
           inputs_data: ${{ needs.load-inputs.outputs.env_vars }}
 
       - name: Create Git tag
-        uses: actions/github-script@v7.0.1
-        env:
-          VERSION: ${{ needs.version.outputs.version }}
+        uses: HerodotusDev/cicd/.github/actions/create-git-tag@main
         with:
-          github-token: ${{ secrets.GITHUB_TOKEN }}
-          script: |
-            const version = process.env.VERSION;
-            github.rest.git.createRef({
-              owner: context.repo.owner,
-              repo: context.repo.repo,
-              ref: `refs/tags/${version}`,
-              sha: context.sha
-            });
+          tag: ${{ needs.version.outputs.version }}
+          token: ${{ secrets.GITHUB_TOKEN }}
 
   deploy-staging:
     needs: [version, create-git-tag, build-and-push-image, load-inputs]

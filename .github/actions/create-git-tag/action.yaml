@@ -4,7 +4,7 @@ inputs:
   tag:
     description: "The Git tag to check."
     required: true
-  github-token:
+  token:
     required: true
     description: "Its a GitHub token"
 runs:
@@ -36,7 +36,7 @@ runs:
       env:
         VERSION: ${{ inputs.tag }}
       with:
-        github-token: ${{ inputs.github-token }}
+        github-token: ${{ inputs.token }}
         script: |
           const version = process.env.VERSION;
           github.rest.git.createRef({
