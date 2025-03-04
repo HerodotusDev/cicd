@@ -60,7 +60,7 @@ To enable k8s deploy, copy the [examples/k8s](./examples/k8s) directory to you r
 [cicd-inputs](./examples/k8s/cicd-inputs.yaml) file specifies variables to be passed to following pipelines and has to be set.
 
 
-### Enabling etcd pull
+## Enabling etcd pull
 
 To enable pulling configuration from etcd, following line have to be added / uncommented from [cicd-inputs](./examples/k8s/cicd-inputs.yaml):
 
