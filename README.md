@@ -32,6 +32,8 @@ Trigger conditions can be set per repo in workflow file
 
    Runs either on push to main branch, or on manual trigger.
 
+   This step requires a package.json to be present in root dir or repo. ( yes, even for rust , well add support for more in the future)
+
    Steps:
 
     - extract version from package.json
