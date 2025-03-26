@@ -97,6 +97,9 @@ jobs:
   build-and-push-image:
     needs: [version, load-inputs]
     runs-on: ubuntu-latest
+    strategy: 
+        matrix:
+            app: [api, daemon]
     steps:
 
       - name: Set inputs
@@ -115,11 +118,11 @@ jobs:
         uses: HerodotusDev/cicd/.github/actions/build-and-push-image@main
         with:
           dockerhub_project: ${{ env.dockerhub_project }}
-          app_name: ${{ env.app_name }}
+          app_name: ${{ matrix.app }}
           version: ${{ needs.version.outputs.version }}
           docker_username: ${{ secrets.DOCKER_USERNAME }}
           docker_password: ${{ secrets.DOCKER_PASSWORD }}
-
+    
   create-git-tag:
     needs: [version, build-and-push-image, load-inputs]
     runs-on: ubuntu-latest 
@@ -139,6 +142,9 @@ jobs:
   deploy-staging:
     needs: [version, create-git-tag, build-and-push-image, load-inputs]
     runs-on: ubuntu-latest
+    strategy: 
+        matrix:
+            app: [api, daemon]    
     if: always()
     steps:      
 
@@ -160,7 +166,7 @@ jobs:
         with:
           kube_config: ${{ secrets.KUBE_CONFIG }}
           namespace: ${{ env.namespace }}
-          app_name: ${{ env.app_name }}
+          app_name: ${{ matrix.app }}
           etcd_user: ${{ secrets.ETCD_USER }}
           etcd_password: ${{ secrets.ETCD_PASSWORD }}
           etcd_key: ${{ env.etcd_key}}
@@ -173,8 +179,8 @@ jobs:
           kube_config: ${{ secrets.KUBE_CONFIG }}
           namespace: ${{ env.namespace }}
           deployment_file: ${{ env.deployment_file }}
-          ingress_file: ${{ env.ingress_file }}
+          ingress_file: ./k8s/${{ matrix.ingress_file }}.yaml
           rollout_timeout: ${{ env.rollout_timeout }}
           image_tag: ${{ needs.version.outputs.version }}
           dockerhub_project: ${{ env.dockerhub_project }}
-          app_name: ${{ env.app_name }}
+          app_name: ${{ matrix.app }}

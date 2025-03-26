@@ -6,6 +6,7 @@
 namespace: example                                # namespace to be deploy  
 app_name: example                                 # name of the app, must be equal to the name of the deployment and docker image
 dockerhub_project: dataprocessor                  # name of the dockerhub project the image will be pushed to / pulled from
+version_file: package.json
 #deployment_file: ./k8s/deployment.yaml           # path to the k8s deployment manifest  // has a default value
 #ingress_file: ./k8s/ingress.yaml                 # path to the k8s ingress manifest  // has a default value
 #rollout_timeout: 300                             # time which github will wait until deployment rollsout  // has a default value

@@ -14,7 +14,7 @@ spec:
     spec:
       containers:
         - name: example
-          ### placeholder to be set by cicd pipeline
+          ### placeholder to be set by cicd pipeline - dont change
           image: <IMAGE>
           env:
             - name: ETCD_URL
