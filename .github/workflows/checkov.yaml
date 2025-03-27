@@ -3,6 +3,7 @@ name: Checkov Security Scan
 on:
     workflow_dispatch:
 
+
 permissions:
     contents: read
     
