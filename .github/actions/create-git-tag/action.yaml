@@ -1,0 +1,47 @@
+name: "Create git tag"
+description: "Checks if a given Git tag exists and fails if it create one if it does not."
+inputs:
+  tag:
+    description: "The Git tag to check."
+    required: true
+  token:
+    required: true
+    description: "Its a GitHub token"
+runs:
+  using: "composite"
+  steps:
+    - name: Check if Git tag already exists
+      uses: mukunku/tag-exists-action@v1.6.0
+      id: check-tag
+      continue-on-error: true
+      with:
+        tag: ${{ inputs.tag }}
+    
+    - name: Fail if tag does not exist
+      if: ${{ steps.check-tag.outputs.exists == 'false' }}
+      shell: bash
+      run: |
+        echo "Tag '${{ inputs.tag }}' does not exist. Creating tag."
+
+
+    - name: Proceed if tag exists
+      if: ${{ steps.check-tag.outputs.exists == 'true' }}
+      shell: bash
+      run: echo "Tag '${{ inputs.tag }}' exists. Proceeding..."
+
+
+    - name: Create Git tag
+      uses: actions/github-script@v7.0.1
+      if: ${{ steps.check-tag.outputs.exists == 'false' }}
+      env:
+        VERSION: ${{ inputs.tag }}
+      with:
+        github-token: ${{ inputs.token }}
+        script: |
+          const version = process.env.VERSION;
+          github.rest.git.createRef({
+            owner: context.repo.owner,
+            repo: context.repo.repo,
+            ref: `refs/tags/${version}`,
+            sha: context.sha
+          });
