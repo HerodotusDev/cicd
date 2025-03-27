@@ -82,7 +82,7 @@ jobs:
 
 
       - name: Extract Version
-        uses: HerodotusDev/cicd/.github/actions/extract-version@main
+        uses: HerodotusDev/cicd/.github/actions/extract-version@monorepo_support
         id: version
         with:
           file: ${{ env.version_file }}   
