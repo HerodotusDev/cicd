@@ -85,9 +85,7 @@ jobs:
         uses: HerodotusDev/cicd/.github/actions/extract-version@main
         id: version
         with:
-          file: ${{ env.version_file }}
-          version_key: .version
-          prefix_with_v: false     
+          file: ${{ env.version_file }}   
 
   build-and-push-image:
     needs: [version, load-inputs]

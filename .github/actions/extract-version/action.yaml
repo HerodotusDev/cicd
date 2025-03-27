@@ -6,14 +6,6 @@ inputs:
     description: "The file containing the version."
     required: true
     default: "package.json"        
-  version_key:
-    description: 'The key under which the version is stored (optional, defaults to ".version").'
-    required: false
-    default: ".version"
-  prefix_with_v:
-    description: 'Whether to prefix the version with "v" (true or false).'
-    required: false
-    default: "false" 
 
 outputs:
   version:
@@ -23,7 +15,6 @@ outputs:
 runs:
   using: "composite"
   steps:
-
     - name: Extract Version
       id: extract_version
       shell: bash
@@ -35,43 +26,31 @@ runs:
           exit 1
         fi
 
-        # Determine file type
         case "$FILE" in
           *.toml) TOOL="toml" ;;
           *.json) TOOL="jq" ;;
-          *.yaml|*.yml) TOOL="yq" ;;
-          *) echo "Unsupported file type: $FILE"; exit 1 ;;
-        esac
-
-        # Install tool if not already installed
-        case "$TOOL" in
-          toml)
-            if ! command -v toml &> /dev/null; then
-              sudo apt-get update && sudo apt-get install -y toml
-            fi
-            ;;
-          jq)
-            if ! command -v jq &> /dev/null; then
-              sudo apt-get update && sudo apt-get install -y jq
-            fi
-            ;;
-          yq)
-            if ! command -v yq &> /dev/null; then
-              sudo apt-get update && sudo apt-get install -y yq
-            fi
+          *)
+            echo "Unsupported file type: $FILE"
+            exit 1
             ;;
         esac
 
-        # Extract version using detected tool
-        case "$TOOL" in
-          toml) VERSION=$(toml get "$FILE" package.version) ;;
-          jq) VERSION=$(jq -r '.version' "$FILE") ;;
-          yq) VERSION=$(yq e -r '.version' "$FILE") ;;
-        esac
+        # Install required tool if missing
+        if ! command -v "$TOOL" &> /dev/null; then
+          sudo apt-get update && sudo apt-get install -y "$TOOL"
+        fi
+
+        # Extract version correctly
+        if [ "$TOOL" = "toml" ]; then
+          VERSION=$(toml get "$FILE" package.version)
+        elif [ "$TOOL" = "jq" ]; then
+          VERSION=$(jq -r '.version' "$FILE")
+        fi
 
         if [ -z "$VERSION" ]; then
           echo "Version not found in $FILE."
           exit 1
         fi
 
-        echo "VERSION=$VERSION" >> $GITHUB_ENV
+        # Correct way to output variables in composite action
+        echo "version=$VERSION" >> $GITHUB_OUTPUT
