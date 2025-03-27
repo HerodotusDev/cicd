@@ -19,10 +19,12 @@ on:
       ETCD_PASSWORD:
         required: false
 
+### those are defaults to be overwritten by inputs files
 env:
   deployment_file: ./k8s/deployment.yaml
   ingress_file: ./k8s/ingress.yaml
-  rollout_timeout: 300         
+  rollout_timeout: 300       
+  version_file: ./package.json  
   
 permissions:
   contents: write

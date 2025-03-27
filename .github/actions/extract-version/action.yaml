@@ -4,8 +4,7 @@ description: "Extracts the version from a specified file using yq."
 inputs:
   file:
     description: "The file containing the version."
-    required: false
-    default: "package.json"        
+    required: false 
 
 outputs:
   version:
