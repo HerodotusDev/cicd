@@ -36,8 +36,14 @@ runs:
         esac
 
         # Install required tool if missing
-        if ! command -v "$TOOL" &> /dev/null; then
-          sudo apt-get update && sudo apt-get install -y "$TOOL"
+        if [ "$TOOL" = "toml" ]; then
+          if ! command -v toml &> /dev/null; then
+            pip install toml-cli
+          fi
+        elif [ "$TOOL" = "jq" ]; then
+          if ! command -v jq &> /dev/null; then
+            sudo apt-get update && sudo apt-get install -y jq
+          fi
         fi
 
         # Extract version correctly
