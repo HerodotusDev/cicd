@@ -87,12 +87,10 @@ jobs:
 
 
       - name: Extract Version
-        uses: HerodotusDev/cicd/.github/actions/extract-version@main
+        uses: HerodotusDev/cicd/.github/actions/extract-version@monorepo_support
         id: version
         with:
           file: ${{ env.version_file }}
-          version_key: .version
-          prefix_with_v: false     
 
   build-and-push-image:
     needs: [version, load-inputs]
