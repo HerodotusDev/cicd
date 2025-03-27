@@ -160,7 +160,7 @@ jobs:
         with:
           kube_config: ${{ secrets.KUBE_CONFIG }}
           namespace: ${{ env.namespace }}
-          app_name: ${{ env.app_name }}-${{ matrix.app }}s
+          app_name: ${{ env.app_name }}-${{ matrix.app }}
           etcd_user: ${{ secrets.ETCD_USER }}
           etcd_password: ${{ secrets.ETCD_PASSWORD }}
           etcd_key: ${{ env.etcd_key}}
