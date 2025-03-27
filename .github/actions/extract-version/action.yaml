@@ -48,7 +48,7 @@ runs:
 
         # Extract version correctly
         if [ "$TOOL" = "toml" ]; then
-          VERSION=$(toml get "$FILE" package.version)
+          VERSION=$(toml get --toml-path "$FILE" package.version)
         elif [ "$TOOL" = "jq" ]; then
           VERSION=$(jq -r '.version' "$FILE")
         fi
