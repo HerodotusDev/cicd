@@ -113,7 +113,7 @@ jobs:
         uses: HerodotusDev/cicd/.github/actions/build-and-push-image@main
         with:
           dockerhub_project: ${{ env.dockerhub_project }}
-          app_name: ${{ env.dockerhub_project }}-${{ matrix.app }}
+          app_name: ${{ env.app_name }}-${{ matrix.app }}
           version: ${{ needs.version.outputs.version }}
           docker_username: ${{ secrets.DOCKER_USERNAME }}
           docker_password: ${{ secrets.DOCKER_PASSWORD }}
@@ -162,7 +162,7 @@ jobs:
         with:
           kube_config: ${{ secrets.KUBE_CONFIG }}
           namespace: ${{ env.namespace }}
-          app_name: ${{ env.dockerhub_project }}-${{ matrix.app }}
+          app_name: ${{ env.app_name }}-${{ matrix.app }}s
           etcd_user: ${{ secrets.ETCD_USER }}
           etcd_password: ${{ secrets.ETCD_PASSWORD }}
           etcd_key: ${{ env.etcd_key}}
@@ -174,9 +174,9 @@ jobs:
         with:
           kube_config: ${{ secrets.KUBE_CONFIG }}
           namespace: ${{ env.namespace }}
-          deployment_file: ./k8s/${{ env.dockerhub_project }}-${{ matrix.app }}.yaml
-          ingress_file: ./k8s/${{ env.dockerhub_project }}-${{ matrix.app }}-ingress.yaml
+          deployment_file: ./k8s/${{ env.app_name }}-${{ matrix.app }}.yaml
+          ingress_file: ./k8s/${{ env.app_name }}-${{ matrix.app }}-ingress.yaml
           rollout_timeout: ${{ env.rollout_timeout }}
           image_tag: ${{ needs.version.outputs.version }}
           dockerhub_project: ${{ env.dockerhub_project }}
-          app_name: ${{ matrix.app }}
+          app_name: ${{ env.app_name }}-${{ matrix.app }}
