@@ -1,0 +1,18 @@
+name: Checkov Security Scan
+
+on:
+    workflow_dispatch:
+
+
+permissions:
+    contents: read
+    
+jobs:
+  scan:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: bridgecrewio/checkov-action@master
+        with:
+          directory: .
+          framework: github_actions

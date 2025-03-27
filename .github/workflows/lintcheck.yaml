@@ -5,6 +5,9 @@ on:
     paths:
       - "./workflows/*.yaml"
       - "./actions/**/*.yaml"
+      
+permissions:
+  contents: read
 
 jobs:
   validate:
