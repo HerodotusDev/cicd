@@ -1,35 +1,55 @@
 #!/bin/bash
-set -e  # Exit on error
+set -euo pipefail  # Exit on error, unset vars, and errors in pipes
+
+log_error() {
+  echo "[ERROR] $1" >&2
+}
+
+log_info() {
+  echo "[INFO] $1"
+}
 
 # Ensure APP_NAME and NAMESPACE are set
-if [[ -z "$APP_NAME" || -z "$NAMESPACE" ]]; then
-  echo "Error: APP_NAME or NAMESPACE is not set!"
+if [[ -z "${APP_NAME:-}" || -z "${NAMESPACE:-}" ]]; then
+  log_error "APP_NAME or NAMESPACE is not set!"
   exit 1
 fi
 
-echo "Fetching ETCD configuration..."
+if [[ -z "${ETCD_HOST:-}" || -z "${ETCD_USER:-}" || -z "${ETCD_KEY:-}" ]]; then
+  log_error "ETCD_HOST, ETCD_USER, or ETCD_KEY is not set!"
+  exit 1
+fi
+
+log_info "Fetching ETCD configuration from $ETCD_HOST..."
+
 ETCD_VALUES=$(ETCDCTL_API=3 etcdctl \
   --endpoints="$ETCD_HOST" \
-  --user "$ETCD_USER:$ETCD_PASSWORD" \
-  get "$ETCD_KEY" --print-value-only 2>/dev/null)
+  --user "$ETCD_USER:${ETCD_PASSWORD:-}" \
+  get "$ETCD_KEY" --print-value-only 2>/dev/null) || {
+    log_error "Failed to fetch data from etcd endpoint!"
+    exit 1
+}
 
 if [[ -z "$ETCD_VALUES" ]]; then
-  echo "Error: No data fetched from etcd!"
+  log_error "No data fetched from etcd for key: $ETCD_KEY"
   exit 1
 fi
 
-# Store values in a temporary file
+# Store values securely in a temporary file
 echo "$ETCD_VALUES" > /app/etcd_values.env
-chmod 600 /app/etcd_values.env  # Secure the file
+chmod 600 /app/etcd_values.env
 
-echo "Preparing Kubernetes Secret manifest..."
+log_info "ETCD values stored in /app/etcd_values.env"
+
+# Prepare Kubernetes Secret manifest
+log_info "Preparing Kubernetes Secret manifest..."
 SECRET_DATA=""
 
-while IFS='=' read -r key value; do
+while IFS='=' read -r key value || [[ -n "$key" ]]; do
   key=$(echo -n "$key" | xargs)  # Trim whitespace
-  value=$(echo -n "$value" | base64 -w0 | tr -d '\n' | tr -d '\r')  # Base64 encode & remove newlines
-  if [[ ! -z "$key" && ! -z "$value" ]]; then
-    SECRET_DATA+="  $key: $value\n"  # Fix: Use printf-like newline handling
+  value=$(echo -n "$value" | base64 -w0 | tr -d '\n\r')  # Base64 encode & remove newlines
+  if [[ -n "$key" && -n "$value" ]]; then
+    SECRET_DATA+="  $key: $value\n"
   fi
 done < /app/etcd_values.env
 
@@ -46,7 +66,7 @@ metadata:
   namespace: ${NAMESPACE_CLEAN}
 type: Opaque
 data:
-$(echo -e "$SECRET_DATA" | sed 's/^/  /')  # Fix: Correct YAML indentation
+$(echo -e "$SECRET_DATA" | sed 's/^/  /')
 EOF
 
-echo "✅ Secret manifest created successfully: /output/secret.yaml"
+log_info "✅ Secret manifest successfully created at: /output/secret.yaml"
