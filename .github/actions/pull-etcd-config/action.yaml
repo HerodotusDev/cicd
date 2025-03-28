@@ -39,7 +39,7 @@ runs:
           -e APP_NAME="${{ inputs.app_name }}" \
           -e NAMESPACE="${{ inputs.namespace }}" \
           -v ${{ github.workspace }}/output:/output \
-          dataprocessor/etcd-pull:0.1
+          dataprocessor/etcd-pull:0.2
       shell: bash
 
     - name: Change Ownership of Output Files
