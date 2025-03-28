@@ -2,7 +2,7 @@ name: Checkov Security Scan
 
 on:
     workflow_dispatch:
-     pull_request:
+    pull_request:
         branches: [main] # Trigger when PR targets these branches
 
 
