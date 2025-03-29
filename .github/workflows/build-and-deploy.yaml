@@ -19,10 +19,12 @@ on:
       ETCD_PASSWORD:
         required: false
 
+### those are defaults to be overwritten by inputs files
 env:
   deployment_file: ./k8s/deployment.yaml
   ingress_file: ./k8s/ingress.yaml
-  rollout_timeout: 300         
+  rollout_timeout: 300       
+  version_file: ./package.json  
   
 permissions:
   contents: write
@@ -90,9 +92,7 @@ jobs:
         uses: HerodotusDev/cicd/.github/actions/extract-version@main
         id: version
         with:
-          file: package.json
-          version_key: .version
-          prefix_with_v: false     
+          file: ${{ env.version_file }}
 
   build-and-push-image:
     needs: [version, load-inputs]
@@ -177,4 +177,4 @@ jobs:
           rollout_timeout: ${{ env.rollout_timeout }}
           image_tag: ${{ needs.version.outputs.version }}
           dockerhub_project: ${{ env.dockerhub_project }}
-          app_name: ${{ env.app_name }}
+          app_name: ${{ env.app_name }}          
