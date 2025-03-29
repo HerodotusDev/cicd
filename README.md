@@ -36,14 +36,13 @@ Trigger conditions can be set per repo in workflow file
 
    Runs either on push to main branch, or on manual trigger.
 
-   This step requires a package.json to be present in root dir or repo. ( yes, even for rust , well add support for more in the future)
-
    Steps:
 
-    - extract version from package.json
+    - extract version from package.json / cargo.toml - file specified in cicd_inputs as version_file
     - if a docker image tagged with this version hasn't been pushed to registry, build it
     - if a git tag with this version doesn't exist, tag the commit 
-    - deploy k8s manifests, using version read from package.json
+    - deploy k8s manifests, using version read from version_file
+    - if etcd-pull is true, pull config from etcd and inject it into k8s secret, if changed restart deployment by adding checksum annotation
 
 
    If there was a change in version, but not in manifests - job will build and run a new version.
