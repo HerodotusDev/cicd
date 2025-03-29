@@ -20,6 +20,10 @@ Workflows need following secrets to be set on repo level:
   ETCD_USER  # only when using etcd pull
 
   ETCD_PASSWORD # only when using etcd pull
+
+  ETCD_HOST
+  
+  
   
 ```
 
@@ -87,6 +91,4 @@ To mount secret as envs, add / uncomment follwing lines from deployment's manife
         name: example-secret
 
 ```
-
-todo toggle ingress deployment
 

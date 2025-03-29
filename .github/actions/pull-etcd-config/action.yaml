@@ -61,3 +61,17 @@ runs:
     - name: Apply Kubernetes Secret
       run: kubectl apply -f ${{ github.workspace }}/output/secret.yaml            
       shell: bash
+
+    - name: Compute Secret Checksum
+      id: secret_checksum
+      shell: bash
+      run: |
+        CHECKSUM=$(sha256sum "${{ github.workspace }}/output/secret.yaml" | awk '{print $1}')
+        echo "checksum=$CHECKSUM" >> $GITHUB_OUTPUT      
+
+    - name: Patch Deployment to Restart
+      shell: bash
+      run: |
+        kubectl patch deployment ${{ inputs.app_name }} \
+          -n ${{ inputs.namespace }} \
+          -p "{\"spec\":{\"template\":{\"metadata\":{\"annotations\":{\"secret-checksum\":\"${{ steps.secret_checksum.outputs.checksum }}\"}}}}}"
