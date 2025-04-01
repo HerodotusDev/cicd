@@ -18,7 +18,7 @@ runs:
   steps:
     - name: Install yq (YAML parser)
       run: |
-        sudo apt update && sudo apt install -y jq
+        sudo apt update && sudo apt install -y jq wget
         wget https://github.com/mikefarah/yq/releases/latest/download/yq_linux_amd64 -O /usr/local/bin/yq
         chmod +x /usr/local/bin/yq
       shell: bash
