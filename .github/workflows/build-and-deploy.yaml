@@ -178,3 +178,4 @@ jobs:
           image_tag: ${{ needs.version.outputs.version }}
           dockerhub_project: ${{ env.dockerhub_project }}
           app_name: ${{ env.app_name }}          
+          service_account_token: ${{ env.ARC_SA_TOKEN }}

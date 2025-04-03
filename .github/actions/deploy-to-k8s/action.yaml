@@ -41,7 +41,6 @@ runs:
       uses: ./.github/actions/configure-kubectl
       with:
         service_account_token: ${{ inputs.service_account_token }}
-        cluster_url: ${{ inputs.cluster_url }}
 
     - name: Update deployment YAML with image tag
       run: |
