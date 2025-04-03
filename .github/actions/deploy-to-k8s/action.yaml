@@ -38,7 +38,7 @@ runs:
       uses: actions/checkout@v3
 
     - name: Configure kubectl
-      uses: ./.github/actions/configure-kubectl
+      uses: HerodotusDev/cicd/.github/actions/configure-kubectl@arc
       with:
         service_account_token: ${{ inputs.service_account_token }}
 
