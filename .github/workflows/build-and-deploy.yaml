@@ -57,8 +57,8 @@ jobs:
       - name: Log in to Docker Hub
         uses: docker/login-action@v2
         with:
-          username: ${{ secrets.DOCKER_USERNAME }}
-          password: ${{ secrets.DOCKER_PASSWORD }}
+          username: ${{ env.ARC_DOCKER_USERNAME }}
+          password: ${{ env.ARC_DOCKER_PASSWORD }}
 
       - name: Pull Siren Image from Registry
         run: docker pull inputs.siren_image}

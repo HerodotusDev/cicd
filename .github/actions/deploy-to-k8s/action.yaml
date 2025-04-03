@@ -2,8 +2,11 @@
 name: "Deploy on K8s"
 description: "Deploys Kubernetes resources using kubectl."
 inputs:
-  kube_config:
-    description: "Contents of the kubeconfig file."
+  service_account_token:
+    description: "Service account token for Kubernetes authentication."
+    required: true
+  cluster_url:
+    description: "Kubernetes API server URL."
     required: true
   namespace:
     description: "Kubernetes namespace to deploy to."
@@ -34,16 +37,11 @@ runs:
     - name: Checkout repository
       uses: actions/checkout@v3
 
-    - name: Set up kubectl
-      uses: azure/setup-kubectl@v4
-      with:
-        version: "v1.32.0"
-
     - name: Configure kubectl
-      run: |
-        mkdir -p ~/.kube
-        echo "${{ inputs.kube_config }}" > ~/.kube/config
-      shell: bash
+      uses: ./.github/actions/configure-kubectl
+      with:
+        service_account_token: ${{ inputs.service_account_token }}
+        cluster_url: ${{ inputs.cluster_url }}
 
     - name: Update deployment YAML with image tag
       run: |
@@ -70,9 +68,7 @@ runs:
         fi
       shell: bash
 
-
     - name: Wait for deployment rollout
       run: |
         kubectl rollout status deployment/"${{ inputs.app_name }}" --namespace "${{ inputs.namespace }}" --timeout=${{ inputs.rollout_timeout }}s
-
       shell: bash

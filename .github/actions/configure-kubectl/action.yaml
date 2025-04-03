@@ -1,0 +1,38 @@
+name: "Configure kubectl"
+description: "Configures kubectl with service account token authentication for in-cluster usage"
+inputs:
+  service_account_token:
+    description: "Service account token for Kubernetes authentication."
+    required: true
+
+runs:
+  using: "composite"
+  steps:
+    - name: Set up kubectl
+      uses: azure/setup-kubectl@v4
+      with:
+        version: "v1.32.0"
+
+    - name: Configure kubectl
+      run: |
+        mkdir -p ~/.kube
+        cat > ~/.kube/config <<EOF
+        apiVersion: v1
+        kind: Config
+        clusters:
+        - cluster:
+            server: https://kubernetes.default.svc
+          name: default-cluster
+        contexts:
+        - context:
+            cluster: default-cluster
+            user: default-user
+          name: default-context
+        current-context: default-context
+        users:
+        - name: default-user
+          user:
+            token: ${{ inputs.service_account_token }}
+        EOF
+        chmod 600 ~/.kube/config
+      shell: bash 
