@@ -64,10 +64,12 @@ jobs:
     runs-on: hero-arc-runners
     steps:
 
-      - name: Set inputs
-        uses: HerodotusDev/cicd/.github/actions/set-inputs@arc
+      - name: Load Inputs from YAML
+        id: load-inputs
+        uses: HerodotusDev/cicd/.github/actions/load-inputs@arc
         with:
-          inputs_data: ${{ needs.load-inputs.outputs.env_vars }} 
+          inputs_file: ${{ inputs.inputs_file }}
+
 
       - name: Checkout Caller Repository
         uses: actions/checkout@v4
@@ -88,10 +90,12 @@ jobs:
     runs-on: hero-arc-runners
     steps:
 
-      - name: Set inputs
-        uses: HerodotusDev/cicd/.github/actions/set-inputs@arc
+      - name: Load Inputs from YAML
+        id: load-inputs
+        uses: HerodotusDev/cicd/.github/actions/load-inputs@arc
         with:
-          inputs_data: ${{ needs.load-inputs.outputs.env_vars }}
+          inputs_file: ${{ inputs.inputs_file }}
+
 
       - name: Checkout Caller Repository
         uses: actions/checkout@v4
@@ -114,10 +118,11 @@ jobs:
     runs-on: hero-arc-runners 
     steps:
 
-      - name: Set inputs
-        uses: HerodotusDev/cicd/.github/actions/set-inputs@arc
+      - name: Load Inputs from YAML
+        id: load-inputs
+        uses: HerodotusDev/cicd/.github/actions/load-inputs@arc
         with:
-          inputs_data: ${{ needs.load-inputs.outputs.env_vars }}
+          inputs_file: ${{ inputs.inputs_file }}
 
       - name: Create Git tag
         uses: HerodotusDev/cicd/.github/actions/create-git-tag@main
@@ -138,10 +143,12 @@ jobs:
           ref: ${{ github.ref }}  # ✅ Check out the same branch as the trigger
           token: ${{ secrets.GITHUB_TOKEN }}  # ✅ Use GitHub token for access    
 
-      - name: Set inputs
-        uses: HerodotusDev/cicd/.github/actions/set-inputs@arc
+      - name: Load Inputs from YAML
+        id: load-inputs
+        uses: HerodotusDev/cicd/.github/actions/load-inputs@arc
         with:
-          inputs_data: ${{ needs.load-inputs.outputs.env_vars }}
+          inputs_file: ${{ inputs.inputs_file }}
+
           
       - name: Pull config from etcd
         uses: HerodotusDev/cicd/.github/actions/pull-etcd-config@main
