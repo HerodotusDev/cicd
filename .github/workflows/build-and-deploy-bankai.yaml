@@ -7,17 +7,7 @@ on:
         type: string
         required: false  
         default: ./k8s/cicd-inputs.yaml
-    secrets:
-      DOCKER_USERNAME:
-        required: true
-      DOCKER_PASSWORD:
-        required: true
-      KUBE_CONFIG:
-        required: true
-      ETCD_USER:
-        required: false
-      ETCD_PASSWORD:
-        required: false
+
 
 env:
   deployment_file: ./k8s/deployment.yaml
@@ -31,7 +21,7 @@ permissions:
 jobs:
 
   load-inputs:
-    runs-on: ubuntu-latest
+    runs-on: hero-arc-runners
     outputs:
       env_vars: ${{ steps.load-inputs.outputs.env_vars }}
     steps:
@@ -50,7 +40,7 @@ jobs:
 
 
   siren:
-    runs-on: ubuntu-latest
+    runs-on: hero-arc-runners
     if: false
     steps:
       - name: Log in to Docker Hub
@@ -71,11 +61,11 @@ jobs:
     needs: load-inputs  
     outputs:
       version: ${{ steps.version.outputs.version }}
-    runs-on: ubuntu-latest
+    runs-on: hero-arc-runners
     steps:
 
       - name: Set inputs
-        uses: HerodotusDev/cicd/.github/actions/set-inputs@main
+        uses: HerodotusDev/cicd/.github/actions/set-inputs@arc
         with:
           inputs_data: ${{ needs.load-inputs.outputs.env_vars }} 
 
@@ -95,14 +85,14 @@ jobs:
 
   build-and-push-image:
     needs: [version, load-inputs]
-    runs-on: ubuntu-latest
+    runs-on: hero-arc-runners
     strategy: 
         matrix:
             app: [api, daemon]
     steps:
 
       - name: Set inputs
-        uses: HerodotusDev/cicd/.github/actions/set-inputs@main
+        uses: HerodotusDev/cicd/.github/actions/set-inputs@arc
         with:
           inputs_data: ${{ needs.load-inputs.outputs.env_vars }}
 
@@ -125,11 +115,11 @@ jobs:
 
   create-git-tag:
     needs: [version, build-and-push-image, load-inputs]
-    runs-on: ubuntu-latest 
+    runs-on: hero-arc-runners 
     steps:
 
       - name: Set inputs
-        uses: HerodotusDev/cicd/.github/actions/set-inputs@main
+        uses: HerodotusDev/cicd/.github/actions/set-inputs@arc
         with:
           inputs_data: ${{ needs.load-inputs.outputs.env_vars }}
 
@@ -141,7 +131,7 @@ jobs:
 
   deploy-staging:
     needs: [version, create-git-tag, build-and-push-image, load-inputs]
-    runs-on: ubuntu-latest
+    runs-on: hero-arc-runners
     strategy: 
         matrix:
             app: [api, daemon]    
@@ -156,7 +146,7 @@ jobs:
           token: ${{ secrets.GITHUB_TOKEN }}  # ✅ Use GitHub token for access    
 
       - name: Set inputs
-        uses: HerodotusDev/cicd/.github/actions/set-inputs@main
+        uses: HerodotusDev/cicd/.github/actions/set-inputs@arc
         with:
           inputs_data: ${{ needs.load-inputs.outputs.env_vars }}
           

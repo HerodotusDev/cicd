@@ -1,6 +1,9 @@
 name: "Set envs from loaded inputs"
 description: "Parses loaded inputs into github envs."
-
+inputs:
+  inputs_data:
+    description: 'Inputs data'
+    required: true
 runs:
   using: "composite"
   steps:
