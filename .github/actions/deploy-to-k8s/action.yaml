@@ -37,10 +37,10 @@ runs:
     - name: Checkout repository
       uses: actions/checkout@v3
 
-    - name: Configure kubectl
-      uses: HerodotusDev/cicd/.github/actions/configure-kubectl@arc
+    - name: Set up kubectl
+      uses: azure/setup-kubectl@v4
       with:
-        service_account_token: ${{ inputs.service_account_token }}
+        version: "v1.32.0"
 
     - name: Update deployment YAML with image tag
       run: |
