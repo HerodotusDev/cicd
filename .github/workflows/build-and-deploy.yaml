@@ -44,21 +44,18 @@ jobs:
       version: ${{ steps.version.outputs.version }}
     runs-on: hero-arc-runners
     steps:
+      - name: Checkout Caller Repository
+        uses: actions/checkout@v4
+        with:
+          repository: ${{ github.repository }}
+          ref: ${{ github.ref }}
+          token: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Load Inputs from YAML
         id: load-inputs
         uses: HerodotusDev/cicd/.github/actions/load-inputs@arc
         with:
           inputs_file: ${{ inputs.inputs_file }}
-
-
-      - name: Checkout Caller Repository
-        uses: actions/checkout@v4
-        with:
-          repository: ${{ github.repository }}  # ✅ Pull the repository that triggered the workflow
-          ref: ${{ github.ref }}  # ✅ Check out the same branch as the trigger
-          token: ${{ secrets.GITHUB_TOKEN }}  # ✅ Use GitHub token for access
-
 
       - name: Extract Version
         uses: HerodotusDev/cicd/.github/actions/extract-version@main
@@ -70,20 +67,18 @@ jobs:
     needs: [version]
     runs-on: hero-arc-runners
     steps:
+      - name: Checkout Caller Repository
+        uses: actions/checkout@v4
+        with:
+          repository: ${{ github.repository }}
+          ref: ${{ github.ref }}
+          token: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Load Inputs from YAML
         id: load-inputs
         uses: HerodotusDev/cicd/.github/actions/load-inputs@arc
         with:
           inputs_file: ${{ inputs.inputs_file }}
-
-
-      - name: Checkout Caller Repository
-        uses: actions/checkout@v4
-        with:
-          repository: ${{ github.repository }}  # ✅ Pull the repository that triggered the workflow
-          ref: ${{ github.ref }}  # ✅ Check out the same branch as the trigger
-          token: ${{ secrets.GITHUB_TOKEN }}  # ✅ Use GitHub token for access
 
       - name: Build and push image
         uses: HerodotusDev/cicd/.github/actions/build-and-push-image@main
@@ -98,6 +93,12 @@ jobs:
     needs: [version, build-and-push-image]
     runs-on: hero-arc-runners 
     steps:
+      - name: Checkout Caller Repository
+        uses: actions/checkout@v4
+        with:
+          repository: ${{ github.repository }}
+          ref: ${{ github.ref }}
+          token: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Load Inputs from YAML
         id: load-inputs
@@ -116,20 +117,18 @@ jobs:
     runs-on: hero-arc-runners
     if: always()
     steps:      
-
       - name: Checkout Caller Repository
         uses: actions/checkout@v4
         with:
-          repository: ${{ github.repository }}  # ✅ Pull the repository that triggered the workflow
-          ref: ${{ github.ref }}  # ✅ Check out the same branch as the trigger
-          token: ${{ secrets.GITHUB_TOKEN }}  # ✅ Use GitHub token for access    
+          repository: ${{ github.repository }}
+          ref: ${{ github.ref }}
+          token: ${{ secrets.GITHUB_TOKEN }}    
 
       - name: Load Inputs from YAML
         id: load-inputs
         uses: HerodotusDev/cicd/.github/actions/load-inputs@arc
         with:
           inputs_file: ${{ inputs.inputs_file }}
-
           
       - name: Pull config from etcd
         uses: HerodotusDev/cicd/.github/actions/pull-etcd-config@main
@@ -141,7 +140,6 @@ jobs:
           etcd_password: ${{ env.ARC_ETCD_PASSWORD }}
           etcd_key: ${{ env.etcd_key}}
           service_account_token: ${{ env.ARC_SA_TOKEN }}
-
 
       - name: Deploy to Kubernetes
         uses: HerodotusDev/cicd/.github/actions/deploy-to-k8s@main
