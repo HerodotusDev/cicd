@@ -20,24 +20,6 @@ permissions:
 
 jobs:
 
-  load-inputs:
-    runs-on: hero-arc-runners
-    outputs:
-      env_vars: ${{ steps.load-inputs.outputs.env_vars }}
-    steps:
-      - name: Checkout Caller Repository
-        uses: actions/checkout@v4
-        with:
-          repository: ${{ github.repository }}  # ✅ Pull the repository that triggered the workflow
-          ref: ${{ github.ref }}  # ✅ Check out the same branch as the trigger
-          token: ${{ secrets.GITHUB_TOKEN }}  # ✅ Use GitHub token for access
-        
-      - name: Load Inputs from YAML
-        id: load-inputs
-        uses: HerodotusDev/cicd/.github/actions/load-inputs@arc
-        with:
-          inputs_file: ${{ inputs.inputs_file }}
-
 
   siren:
     runs-on: hero-arc-runners
@@ -57,8 +39,7 @@ jobs:
           docker run --rm inputs.siren_image|| exit 1
         shell: bash
 
-  version:
-    needs: load-inputs  
+  version:  
     outputs:
       version: ${{ steps.version.outputs.version }}
     runs-on: hero-arc-runners
@@ -86,7 +67,7 @@ jobs:
           file: ${{ env.version_file }}
 
   build-and-push-image:
-    needs: [version, load-inputs]
+    needs: [version]
     runs-on: hero-arc-runners
     steps:
 
@@ -114,7 +95,7 @@ jobs:
           docker_password: ${{ env.ARC_DOCKER_PASSWORD }}
 
   create-git-tag:
-    needs: [version, build-and-push-image, load-inputs]
+    needs: [version, build-and-push-image]
     runs-on: hero-arc-runners 
     steps:
 
@@ -131,7 +112,7 @@ jobs:
           token: ${{ secrets.GITHUB_TOKEN }}
 
   deploy-staging:
-    needs: [version, create-git-tag, build-and-push-image, load-inputs]
+    needs: [version, create-git-tag, build-and-push-image]
     runs-on: hero-arc-runners
     if: always()
     steps:      
