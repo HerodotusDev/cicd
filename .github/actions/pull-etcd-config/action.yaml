@@ -22,8 +22,8 @@ inputs:
   app_name:
     description: 'Application name'
     required: true
-  kube_config:
-    description: 'Kubeconfig content'
+  service_account_token:
+    description: "Service account token for Kubernetes authentication."
     required: true
 
 runs:
@@ -52,11 +52,9 @@ runs:
         version: "v1.32.0"
 
     - name: Configure kubectl
-      run: |
-        mkdir -p ~/.kube
-        echo "${{ inputs.KUBE_CONFIG }}" > ~/.kube/config
-        chmod 600 ~/.kube/config
-      shell: bash
+      uses: HerodotusDev/cicd/.github/actions/configure-kubectl@arc
+      with:
+        service_account_token: ${{ inputs.service_account_token }}
 
     - name: Apply Kubernetes Secret
       run: kubectl apply -f ${{ github.workspace }}/output/secret.yaml            

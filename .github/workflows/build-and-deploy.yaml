@@ -7,17 +7,6 @@ on:
         type: string
         required: false  
         default: ./k8s/cicd-inputs.yaml
-    secrets:
-      DOCKER_USERNAME:
-        required: true
-      DOCKER_PASSWORD:
-        required: true
-      KUBE_CONFIG:
-        required: true
-      ETCD_USER:
-        required: false
-      ETCD_PASSWORD:
-        required: false
 
 ### those are defaults to be overwritten by inputs files
 env:
@@ -32,7 +21,7 @@ permissions:
 jobs:
 
   load-inputs:
-    runs-on: ubuntu-latest
+    runs-on: hero-arc-runners
     outputs:
       env_vars: ${{ steps.load-inputs.outputs.env_vars }}
     steps:
@@ -51,7 +40,7 @@ jobs:
 
 
   siren:
-    runs-on: ubuntu-latest
+    runs-on: hero-arc-runners
     if: false
     steps:
       - name: Log in to Docker Hub
@@ -72,7 +61,7 @@ jobs:
     needs: load-inputs  
     outputs:
       version: ${{ steps.version.outputs.version }}
-    runs-on: ubuntu-latest
+    runs-on: hero-arc-runners
     steps:
 
       - name: Set inputs
@@ -96,7 +85,7 @@ jobs:
 
   build-and-push-image:
     needs: [version, load-inputs]
-    runs-on: ubuntu-latest
+    runs-on: hero-arc-runners
     steps:
 
       - name: Set inputs
@@ -117,12 +106,12 @@ jobs:
           dockerhub_project: ${{ env.dockerhub_project }}
           app_name: ${{ env.app_name }}
           version: ${{ needs.version.outputs.version }}
-          docker_username: ${{ secrets.DOCKER_USERNAME }}
-          docker_password: ${{ secrets.DOCKER_PASSWORD }}
+          docker_username: ${{ env.ARC_DOCKER_USERNAME }}
+          docker_password: ${{ env.ARC_DOCKER_PASSWORD }}
 
   create-git-tag:
     needs: [version, build-and-push-image, load-inputs]
-    runs-on: ubuntu-latest 
+    runs-on: hero-arc-runners 
     steps:
 
       - name: Set inputs
@@ -138,7 +127,7 @@ jobs:
 
   deploy-staging:
     needs: [version, create-git-tag, build-and-push-image, load-inputs]
-    runs-on: ubuntu-latest
+    runs-on: hero-arc-runners
     if: always()
     steps:      
 
@@ -158,19 +147,17 @@ jobs:
         uses: HerodotusDev/cicd/.github/actions/pull-etcd-config@main
         if: ${{ env.pull_etcd_config == 'true' }}
         with:
-          kube_config: ${{ secrets.KUBE_CONFIG }}
           namespace: ${{ env.namespace }}
           app_name: ${{ env.app_name }}
-          etcd_user: ${{ secrets.ETCD_USER }}
-          etcd_password: ${{ secrets.ETCD_PASSWORD }}
+          etcd_user: ${{ env.ARC_ETCD_USER }}
+          etcd_password: ${{ env.ARC_ETCD_PASSWORD }}
           etcd_key: ${{ env.etcd_key}}
-
+          service_account_token: ${{ env.ARC_SA_TOKEN }}
 
 
       - name: Deploy to Kubernetes
         uses: HerodotusDev/cicd/.github/actions/deploy-to-k8s@main
         with:
-          kube_config: ${{ secrets.KUBE_CONFIG }}
           namespace: ${{ env.namespace }}
           deployment_file: ${{ env.deployment_file }}
           ingress_file: ${{ env.ingress_file }}
