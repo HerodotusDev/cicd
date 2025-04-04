@@ -65,7 +65,7 @@ jobs:
     steps:
 
       - name: Set inputs
-        uses: HerodotusDev/cicd/.github/actions/set-inputs@main
+        uses: HerodotusDev/cicd/.github/actions/set-inputs@arc
         with:
           inputs_data: ${{ needs.load-inputs.outputs.env_vars }} 
 
@@ -89,7 +89,7 @@ jobs:
     steps:
 
       - name: Set inputs
-        uses: HerodotusDev/cicd/.github/actions/set-inputs@main
+        uses: HerodotusDev/cicd/.github/actions/set-inputs@arc
         with:
           inputs_data: ${{ needs.load-inputs.outputs.env_vars }}
 
@@ -115,7 +115,7 @@ jobs:
     steps:
 
       - name: Set inputs
-        uses: HerodotusDev/cicd/.github/actions/set-inputs@main
+        uses: HerodotusDev/cicd/.github/actions/set-inputs@arc
         with:
           inputs_data: ${{ needs.load-inputs.outputs.env_vars }}
 
@@ -139,7 +139,7 @@ jobs:
           token: ${{ secrets.GITHUB_TOKEN }}  # ✅ Use GitHub token for access    
 
       - name: Set inputs
-        uses: HerodotusDev/cicd/.github/actions/set-inputs@main
+        uses: HerodotusDev/cicd/.github/actions/set-inputs@arc
         with:
           inputs_data: ${{ needs.load-inputs.outputs.env_vars }}
           
