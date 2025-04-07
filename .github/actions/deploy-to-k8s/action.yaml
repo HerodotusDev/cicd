@@ -31,6 +31,11 @@ inputs:
   app_name:
     description: "The application name to form the image name."
     required: true    
+  secret_changed:
+    description: "Whether the secret has changed and deployment needs restart"
+    required: false
+    default: "false"
+
 runs:
   using: "composite"
   steps:
@@ -45,6 +50,28 @@ runs:
     - name: Update deployment YAML with image tag
       run: |
         sed -i "s|<IMAGE>|${{ inputs.dockerhub_project }}/${{ inputs.app_name }}:${{ inputs.image_tag }}|g" "${{ inputs.deployment_file }}"
+      shell: bash
+      
+    - name: Check Deployment Changes
+      id: check_deployment
+      run: |
+        # Get current deployment manifest
+        CURRENT_MANIFEST=$(kubectl get deployment ${{ inputs.app_name }} -n ${{ inputs.namespace }} -o yaml 2>/dev/null || echo "")
+        
+        if [ -z "$CURRENT_MANIFEST" ]; then
+          # No existing deployment, mark as changed
+          echo "changed=true" >> $GITHUB_OUTPUT
+        else
+          # Compare with new manifest (excluding status and metadata.annotations)
+          NEW_MANIFEST=$(cat ${{ inputs.deployment_file }} | yq 'del(.status, .metadata.annotations)')
+          CURRENT_MANIFEST=$(echo "$CURRENT_MANIFEST" | yq 'del(.status, .metadata.annotations)')
+          
+          if [ "$NEW_MANIFEST" != "$CURRENT_MANIFEST" ]; then
+            echo "changed=true" >> $GITHUB_OUTPUT
+          else
+            echo "changed=false" >> $GITHUB_OUTPUT
+          fi
+        fi
       shell: bash
       
     - name: Deploy Deployment YAML (if exists)
@@ -65,6 +92,13 @@ runs:
         else
           echo "No Ingress file found. Skipping deployment."
         fi
+      shell: bash
+
+    - name: Restart Deployment if Secret Changed
+      if: inputs.secret_changed == 'true' && steps.check_deployment.outputs.changed == 'false'
+      run: |
+        echo "Secret changed but deployment didn't - restarting deployment..."
+        kubectl rollout restart deployment/${{ inputs.app_name }} -n ${{ inputs.namespace }}
       shell: bash
 
     - name: Wait for deployment rollout

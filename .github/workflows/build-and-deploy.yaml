@@ -116,6 +116,8 @@ jobs:
     needs: [version, create-git-tag, build-and-push-image]
     runs-on: hero-arc-runners
     if: always()
+    outputs:
+      secret_changed: ${{ steps.pull_config.outputs.secret_changed }}
     steps:      
       - name: Checkout Caller Repository
         uses: actions/checkout@v4
@@ -131,6 +133,7 @@ jobs:
           inputs_file: ${{ inputs.inputs_file }}
           
       - name: Pull config from etcd
+        id: pull_config
         uses: HerodotusDev/cicd/.github/actions/pull-etcd-config@main
         if: ${{ env.pull_etcd_config == 'true' }}
         with:
@@ -152,3 +155,4 @@ jobs:
           dockerhub_project: ${{ env.dockerhub_project }}
           app_name: ${{ env.app_name }}          
           service_account_token: ${{ env.ARC_SA_TOKEN }}
+          secret_changed: ${{ steps.pull_config.outputs.secret_changed }}
