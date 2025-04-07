@@ -134,7 +134,7 @@ jobs:
           
       - name: Pull config from etcd
         id: pull_config
-        uses: HerodotusDev/cicd/.github/actions/pull-etcd-config@main
+        uses: HerodotusDev/cicd/.github/actions/pull-etcd-config@arc
         if: ${{ env.pull_etcd_config == 'true' }}
         with:
           namespace: ${{ env.namespace }}
@@ -145,7 +145,7 @@ jobs:
           service_account_token: ${{ env.ARC_SA_TOKEN }}
 
       - name: Deploy to Kubernetes
-        uses: HerodotusDev/cicd/.github/actions/deploy-to-k8s@main
+        uses: HerodotusDev/cicd/.github/actions/deploy-to-k8s@arc
         with:
           namespace: ${{ env.namespace }}
           deployment_file: ${{ env.deployment_file }}
