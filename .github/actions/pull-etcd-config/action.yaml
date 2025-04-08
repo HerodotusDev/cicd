@@ -40,7 +40,7 @@ runs:
     - name: Pull and Run Secret Preparation Container
       run: |
         docker run --rm \
-          -e ETCD_HOST="${{ inputs.ETCD_HOST }}" \
+          -e ETCD_HOST="etcd.svc.cluster.local:2379" \
           -e ETCD_USER="${{ inputs.ETCD_USER }}" \
           -e ETCD_PASSWORD="${{ inputs.ETCD_PASSWORD }}" \
           -e ETCD_KEY="${{ inputs.ETCD_KEY }}" \
