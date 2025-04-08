@@ -18,40 +18,43 @@ runs:
         fi
 
         echo "✅ Reading input variables..."
+        echo "📄 Processing file: ${{ inputs.inputs_file }}"
         
         # Read the file line by line and set environment variables
-        while IFS= read -r line; do
+        while IFS= read -r line || [ -n "$line" ]; do  # Added -n "$line" to catch the last line
+          # Debug: Print raw line
+          echo "📝 Processing line: '$line'"
+          
           # Skip empty lines and full-line comments
           if [[ -z "$line" || "$line" =~ ^[[:space:]]*# ]]; then
+            echo "⏭️ Skipping comment or empty line"
             continue
           fi
           
           # Remove inline comments and trim
+          original_line="$line"
           line="${line%%#*}"
-          line="${line%"${line##*[![:space:]]}"}"
+          line="$(echo "$line" | sed -e 's/^[[:space:]]*//' -e 's/[[:space:]]*$//')"
           
-          # Extract key and value
-          if [[ "$line" =~ ^([^:]+):[[:space:]]*(.+)$ ]]; then
-            key="${BASH_REMATCH[1]}"
-            value="${BASH_REMATCH[2]}"
+          # Extract key and value using improved pattern matching
+          if [[ "$line" =~ ^([^:]+)[[:space:]]*:[[:space:]]*(.+)$ ]]; then
+            key="$(echo "${BASH_REMATCH[1]}" | sed -e 's/^[[:space:]]*//' -e 's/[[:space:]]*$//')"
+            value="$(echo "${BASH_REMATCH[2]}" | sed -e 's/^[[:space:]]*//' -e 's/[[:space:]]*$//')"
             
-            # Remove quotes if present and trim
+            # Remove quotes if present
             value="${value%\"}"
             value="${value#\"}"
-            value="${value%"${value##*[![:space:]]}"}"
-            
-            # Special handling for etcd_key to preserve the path format
-            if [[ "$key" == "etcd_key" ]]; then
-              # Remove any trailing spaces but preserve the path structure
-              value="$(echo "$value" | sed 's/[[:space:]]*$//')"
-            fi
             
             # Set the environment variable
             echo "$key=$value" >> "$GITHUB_ENV"
-            echo "Set $key=$value"
+            echo "✅ Set $key=$value"
+          else
+            echo "⚠️ Warning: Could not parse line: '$original_line'"
           fi
         done < "${{ inputs.inputs_file }}"
         
         echo "✅ All variables loaded successfully"
+        echo "📋 Final environment variables:"
+        cat "$GITHUB_ENV"
       shell: bash
 
