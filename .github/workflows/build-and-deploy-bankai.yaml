@@ -20,25 +20,6 @@ permissions:
 
 jobs:
 
-  load-inputs:
-    runs-on: hero-arc-runners
-    outputs:
-      env_vars: ${{ steps.load-inputs.outputs.env_vars }}
-    steps:
-      - name: Checkout Caller Repository
-        uses: actions/checkout@v4
-        with:
-          repository: ${{ github.repository }}  # ✅ Pull the repository that triggered the workflow
-          ref: ${{ github.ref }}  # ✅ Check out the same branch as the trigger
-          token: ${{ secrets.GITHUB_TOKEN }}  # ✅ Use GitHub token for access
-        
-      - name: Load Inputs from YAML
-        id: load-inputs
-        uses: HerodotusDev/cicd/.github/actions/load-inputs@arc
-        with:
-          inputs_file: ${{ inputs.inputs_file }}
-
-
   siren:
     runs-on: hero-arc-runners
     if: false
@@ -58,16 +39,16 @@ jobs:
         shell: bash
 
   version:
-    needs: load-inputs  
     outputs:
       version: ${{ steps.version.outputs.version }}
     runs-on: hero-arc-runners
     steps:
 
-      - name: Set inputs
-        uses: HerodotusDev/cicd/.github/actions/set-inputs@arc
+      - name: Load Inputs from YAML
+        id: load-inputs
+        uses: HerodotusDev/cicd/.github/actions/load-inputs@arc
         with:
-          inputs_data: ${{ needs.load-inputs.outputs.env_vars }} 
+          inputs_file: ${{ inputs.inputs_file }}
 
       - name: Checkout Caller Repository
         uses: actions/checkout@v4
@@ -84,17 +65,12 @@ jobs:
           file: ${{ env.version_file }}   
 
   build-and-push-image:
-    needs: [version, load-inputs]
+    needs: [version]
     runs-on: hero-arc-runners
     strategy: 
         matrix:
             app: [api, daemon]
     steps:
-
-      - name: Set inputs
-        uses: HerodotusDev/cicd/.github/actions/set-inputs@arc
-        with:
-          inputs_data: ${{ needs.load-inputs.outputs.env_vars }}
 
       - name: Checkout Caller Repository
         uses: actions/checkout@v4
@@ -102,6 +78,12 @@ jobs:
           repository: ${{ github.repository }}  # ✅ Pull the repository that triggered the workflow
           ref: ${{ github.ref }}  # ✅ Check out the same branch as the trigger
           token: ${{ secrets.GITHUB_TOKEN }}  # ✅ Use GitHub token for access
+
+      - name: Load Inputs from YAML
+        id: load-inputs
+        uses: HerodotusDev/cicd/.github/actions/load-inputs@arc
+        with:
+          inputs_file: ${{ inputs.inputs_file }}          
 
       - name: Build and push image
         uses: HerodotusDev/cicd/.github/actions/build-and-push-image@arc
@@ -114,14 +96,22 @@ jobs:
           dockerfile: ./docker/Dockerfile.${{ matrix.app }}
 
   create-git-tag:
-    needs: [version, build-and-push-image, load-inputs]
+    needs: [version, build-and-push-image]
     runs-on: hero-arc-runners 
     steps:
 
-      - name: Set inputs
-        uses: HerodotusDev/cicd/.github/actions/set-inputs@arc
+      - name: Checkout Caller Repository
+        uses: actions/checkout@v4
         with:
-          inputs_data: ${{ needs.load-inputs.outputs.env_vars }}
+          repository: ${{ github.repository }}
+          ref: ${{ github.ref }}
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Load Inputs from YAML
+        id: load-inputs
+        uses: HerodotusDev/cicd/.github/actions/load-inputs@arc
+        with:
+          inputs_file: ${{ inputs.inputs_file }}
 
       - name: Create Git tag
         uses: HerodotusDev/cicd/.github/actions/create-git-tag@arc
@@ -130,7 +120,7 @@ jobs:
           token: ${{ secrets.GITHUB_TOKEN }}
 
   deploy-staging:
-    needs: [version, create-git-tag, build-and-push-image, load-inputs]
+    needs: [version, create-git-tag, build-and-push-image]
     runs-on: hero-arc-runners
     strategy: 
         matrix:
@@ -145,10 +135,11 @@ jobs:
           ref: ${{ github.ref }}  # ✅ Check out the same branch as the trigger
           token: ${{ secrets.GITHUB_TOKEN }}  # ✅ Use GitHub token for access    
 
-      - name: Set inputs
-        uses: HerodotusDev/cicd/.github/actions/set-inputs@arc
+      - name: Load Inputs from YAML
+        id: load-inputs
+        uses: HerodotusDev/cicd/.github/actions/load-inputs@arc
         with:
-          inputs_data: ${{ needs.load-inputs.outputs.env_vars }}
+          inputs_file: ${{ inputs.inputs_file }}
           
       - name: Pull config from etcd
         uses: HerodotusDev/cicd/.github/actions/pull-etcd-config@arc
