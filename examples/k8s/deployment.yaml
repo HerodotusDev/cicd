@@ -58,3 +58,17 @@ spec:
   ports:
     - port: 8040
       targetPort: 8040
+### IF YOU NEED PERSISTENCE UNCOMMENT
+#---
+#apiVersion: v1
+#kind: PersistentVolumeClaim
+#metadata:
+#  name: example-pvc
+#spec:
+#  accessModes:
+#  - ReadWriteOnce
+#  resources:
+#    requests:
+#      storage: 1Gi
+#  storageClassName: lh-common
+
