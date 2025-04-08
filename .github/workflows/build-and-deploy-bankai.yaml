@@ -34,7 +34,7 @@ jobs:
         
       - name: Load Inputs from YAML
         id: load-inputs
-        uses: HerodotusDev/cicd/.github/actions/load-inputs@main
+        uses: HerodotusDev/cicd/.github/actions/load-inputs@arc
         with:
           inputs_file: ${{ inputs.inputs_file }}
 
@@ -78,7 +78,7 @@ jobs:
 
 
       - name: Extract Version
-        uses: HerodotusDev/cicd/.github/actions/extract-version@main
+        uses: HerodotusDev/cicd/.github/actions/extract-version@arc
         id: version
         with:
           file: ${{ env.version_file }}   
@@ -104,7 +104,7 @@ jobs:
           token: ${{ secrets.GITHUB_TOKEN }}  # ✅ Use GitHub token for access
 
       - name: Build and push image
-        uses: HerodotusDev/cicd/.github/actions/build-and-push-image@main
+        uses: HerodotusDev/cicd/.github/actions/build-and-push-image@arc
         with:
           dockerhub_project: ${{ env.dockerhub_project }}
           app_name: ${{ env.app_name }}-${{ matrix.app }}
@@ -124,7 +124,7 @@ jobs:
           inputs_data: ${{ needs.load-inputs.outputs.env_vars }}
 
       - name: Create Git tag
-        uses: HerodotusDev/cicd/.github/actions/create-git-tag@main
+        uses: HerodotusDev/cicd/.github/actions/create-git-tag@arc
         with:
           tag: ${{ needs.version.outputs.version }}
           token: ${{ secrets.GITHUB_TOKEN }}
@@ -151,7 +151,7 @@ jobs:
           inputs_data: ${{ needs.load-inputs.outputs.env_vars }}
           
       - name: Pull config from etcd
-        uses: HerodotusDev/cicd/.github/actions/pull-etcd-config@main
+        uses: HerodotusDev/cicd/.github/actions/pull-etcd-config@arc
         if: ${{ env.pull_etcd_config == 'true' }}
         with:
           kube_config: ${{ secrets.KUBE_CONFIG }}
@@ -164,7 +164,7 @@ jobs:
 
 
       - name: Deploy to Kubernetes
-        uses: HerodotusDev/cicd/.github/actions/deploy-to-k8s@main
+        uses: HerodotusDev/cicd/.github/actions/deploy-to-k8s@arc
         with:
           kube_config: ${{ secrets.KUBE_CONFIG }}
           namespace: ${{ env.namespace }}
