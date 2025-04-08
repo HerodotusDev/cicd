@@ -40,6 +40,12 @@ runs:
             value="${value#\"}"
             value="${value%"${value##*[![:space:]]}"}"
             
+            # Special handling for etcd_key to preserve the path format
+            if [[ "$key" == "etcd_key" ]]; then
+              # Remove any trailing spaces but preserve the path structure
+              value="$(echo "$value" | sed 's/[[:space:]]*$//')"
+            fi
+            
             # Set the environment variable
             echo "$key=$value" >> "$GITHUB_ENV"
             echo "Set $key=$value"
