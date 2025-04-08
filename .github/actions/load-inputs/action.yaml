@@ -18,16 +18,11 @@ runs:
         fi
 
         echo "✅ Reading input variables..."
-        echo "📄 Processing file: ${{ inputs.inputs_file }}"
         
         # Read the file line by line and set environment variables
         while IFS= read -r line || [ -n "$line" ]; do  # Added -n "$line" to catch the last line
-          # Debug: Print raw line
-          echo "📝 Processing line: '$line'"
-          
           # Skip empty lines and full-line comments
           if [[ -z "$line" || "$line" =~ ^[[:space:]]*# ]]; then
-            echo "⏭️ Skipping comment or empty line"
             continue
           fi
           
@@ -47,14 +42,12 @@ runs:
             
             # Set the environment variable
             echo "$key=$value" >> "$GITHUB_ENV"
-            echo "✅ Set $key=$value"
+            echo "Set $key=$value"
           else
             echo "⚠️ Warning: Could not parse line: '$original_line'"
           fi
         done < "${{ inputs.inputs_file }}"
         
         echo "✅ All variables loaded successfully"
-        echo "📋 Final environment variables:"
-        cat "$GITHUB_ENV"
       shell: bash
 

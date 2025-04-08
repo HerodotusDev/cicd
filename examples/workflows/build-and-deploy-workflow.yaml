@@ -14,10 +14,4 @@ permissions:
 
 jobs:
   call-deploy:
-    uses: HerodotusDev/cicd/.github/workflows/build-and-deploy.yaml@main
-    secrets:
-      DOCKER_USERNAME: ${{ secrets.DOCKER_USERNAME }}
-      DOCKER_PASSWORD: ${{ secrets.DOCKER_PASSWORD }}
-      KUBE_CONFIG: ${{ secrets.KUBE_CONFIG }}
-      ETCD_USER: ${{ secrets.ETCD_USER }}
-      ETCD_PASSWORD: ${{ secrets.ETCD_PASSWORD }}
+    uses: HerodotusDev/cicd/.github/workflows/build-and-deploy.yaml@arc

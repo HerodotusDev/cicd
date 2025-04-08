@@ -10,4 +10,4 @@ dockerhub_project: dataprocessor                  # name of the dockerhub projec
 #ingress_file: ./k8s/ingress.yaml                 # path to the k8s ingress manifest  // has a default value
 #rollout_timeout: 300                             # time which github will wait until deployment rollsout  // has a default value
 #pull_etcd_config: true                           # bool - if true, will pull config from etcd
-#etcd_key: /grower/envs/.env.stage                # path to file to be pulled from etcd
+#etcd_key: grower/envs/.env.stage                # path to file to be pulled from etcd
