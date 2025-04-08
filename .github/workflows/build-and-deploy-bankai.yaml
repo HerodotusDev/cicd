@@ -43,13 +43,7 @@ jobs:
       version: ${{ steps.version.outputs.version }}
     runs-on: hero-arc-runners
     steps:
-
-      - name: Load Inputs from YAML
-        id: load-inputs
-        uses: HerodotusDev/cicd/.github/actions/load-inputs@arc
-        with:
-          inputs_file: ${{ inputs.inputs_file }}
-
+    
       - name: Checkout Caller Repository
         uses: actions/checkout@v4
         with:
@@ -57,6 +51,11 @@ jobs:
           ref: ${{ github.ref }}  # ✅ Check out the same branch as the trigger
           token: ${{ secrets.GITHUB_TOKEN }}  # ✅ Use GitHub token for access
 
+      - name: Load Inputs from YAML
+        id: load-inputs
+        uses: HerodotusDev/cicd/.github/actions/load-inputs@arc
+        with:
+          inputs_file: ${{ inputs.inputs_file }}
 
       - name: Extract Version
         uses: HerodotusDev/cicd/.github/actions/extract-version@arc
