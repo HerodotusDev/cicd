@@ -18,6 +18,24 @@ permissions:
   contents: write
 
 jobs:
+  load-app-names:
+    runs-on: hero-arc-runners
+    outputs:
+      app_names: ${{ steps.load-app-names.outputs.app_names }}
+    steps:
+      - name: Checkout Caller Repository
+        uses: actions/checkout@v4
+        with:
+          repository: ${{ github.repository }}
+          ref: ${{ github.ref }}
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Load App Names
+        id: load-app-names
+        uses: HerodotusDev/cicd/.github/actions/load-inputs@arc
+        with:
+          inputs_file: ${{ inputs.inputs_file }}
+
   siren:
     runs-on: hero-arc-runners
     if: false
@@ -61,11 +79,11 @@ jobs:
           file: ${{ env.version_file }}
 
   build-and-push-image:
-    needs: [version]
+    needs: [load-app-names, version]
     runs-on: hero-arc-runners
     strategy:
       matrix:
-        app: ${{ fromJson(steps.load-inputs.outputs.app_names) }}
+        app: ${{ fromJson(needs.load-app-names.outputs.app_names) }}
     steps:
       - name: Checkout Caller Repository
         uses: actions/checkout@v4
@@ -114,11 +132,11 @@ jobs:
           token: ${{ secrets.GITHUB_TOKEN }}
 
   deploy-staging:
-    needs: [version, create-git-tag, build-and-push-image]
+    needs: [load-app-names, version, create-git-tag, build-and-push-image]
     runs-on: hero-arc-runners
     strategy:
       matrix:
-        app: ${{ fromJson(steps.load-inputs.outputs.app_names) }}
+        app: ${{ fromJson(needs.load-app-names.outputs.app_names) }}
     if: always()
     outputs:
       secret_changed: ${{ steps.pull_config.outputs.secret_changed }}
