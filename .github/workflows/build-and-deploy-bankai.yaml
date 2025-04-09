@@ -21,7 +21,7 @@ jobs:
   load-app-names:
     runs-on: hero-arc-runners
     outputs:
-      app_names: ${{ steps.load-app-names.outputs.app_names }}
+      matrix_apps: ${{ steps.set-matrix.outputs.matrix_apps }}
     steps:
       - name: Checkout Caller Repository
         uses: actions/checkout@v4
@@ -35,6 +35,14 @@ jobs:
         uses: HerodotusDev/cicd/.github/actions/load-inputs@arc
         with:
           inputs_file: ${{ inputs.inputs_file }}
+
+      - name: Set Matrix Output
+        id: set-matrix
+        run: |
+          # Convert the app_names list to a JSON string
+          MATRIX_APPS=$(echo '{"app":'$(echo ${{ steps.load-app-names.outputs.app_names }} | jq -c .)'}')
+          echo "matrix_apps=$MATRIX_APPS" >> $GITHUB_OUTPUT
+        shell: bash
 
   siren:
     runs-on: hero-arc-runners
@@ -82,8 +90,7 @@ jobs:
     needs: [load-app-names, version]
     runs-on: hero-arc-runners
     strategy:
-      matrix:
-        app: ${{ fromJson(needs.load-app-names.outputs.app_names) }}
+      matrix: ${{ fromJson(needs.load-app-names.outputs.matrix_apps) }}
     steps:
       - name: Checkout Caller Repository
         uses: actions/checkout@v4
@@ -135,8 +142,7 @@ jobs:
     needs: [load-app-names, version, create-git-tag, build-and-push-image]
     runs-on: hero-arc-runners
     strategy:
-      matrix:
-        app: ${{ fromJson(needs.load-app-names.outputs.app_names) }}
+      matrix: ${{ fromJson(needs.load-app-names.outputs.matrix_apps) }}
     if: always()
     outputs:
       secret_changed: ${{ steps.pull_config.outputs.secret_changed }}
