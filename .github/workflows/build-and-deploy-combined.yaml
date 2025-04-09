@@ -63,9 +63,6 @@ jobs:
   build-and-push-image:
     needs: [version]
     runs-on: hero-arc-runners
-    strategy:
-      matrix:
-        app: ${{ fromJson(steps.load-inputs.outputs.app_names) }}
     steps:
       - name: Checkout Caller Repository
         uses: actions/checkout@v4
@@ -80,15 +77,14 @@ jobs:
         with:
           inputs_file: ${{ inputs.inputs_file }}
 
-      - name: Build and push image
+      - name: Build and push images
         uses: HerodotusDev/cicd/.github/actions/build-and-push-image@arc
         with:
           dockerhub_project: ${{ steps.load-inputs.outputs.dockerhub_project }}
-          app_name: ${{ matrix.app }}
+          app_names: ${{ steps.load-inputs.outputs.app_names }}
           version: ${{ needs.version.outputs.version }}
           docker_username: ${{ env.ARC_DOCKER_USERNAME }}
           docker_password: ${{ env.ARC_DOCKER_PASSWORD }}
-          dockerfile: ./docker/Dockerfile.${{ matrix.app }}
 
   create-git-tag:
     needs: [version, build-and-push-image]
@@ -116,12 +112,6 @@ jobs:
   deploy-staging:
     needs: [version, create-git-tag, build-and-push-image]
     runs-on: hero-arc-runners
-    strategy:
-      matrix:
-        app: ${{ fromJson(steps.load-inputs.outputs.app_names) }}
-    if: always()
-    outputs:
-      secret_changed: ${{ steps.pull_config.outputs.secret_changed }}
     steps:
       - name: Checkout Caller Repository
         uses: actions/checkout@v4
@@ -136,25 +126,13 @@ jobs:
         with:
           inputs_file: ${{ inputs.inputs_file }}
 
-      - name: Pull config from etcd
-        id: pull_config
-        uses: HerodotusDev/cicd/.github/actions/pull-etcd-config@arc
-        if: ${{ steps.load-inputs.outputs.pull_etcd_config == 'true' }}
-        with:
-          namespace: ${{ steps.load-inputs.outputs.namespace }}
-          app_name: ${{ matrix.app }}
-          etcd_user: ${{ env.ARC_ETCD_USER }}
-          etcd_password: ${{ env.ARC_ETCD_PASSWORD }}
-          etcd_key: ${{ steps.load-inputs.outputs.etcd_key }}
-
       - name: Deploy to Kubernetes
         uses: HerodotusDev/cicd/.github/actions/deploy-to-k8s@arc
         with:
           namespace: ${{ steps.load-inputs.outputs.namespace }}
-          deployment_file: ./k8s/${{ matrix.app }}.yaml
-          ingress_file: ./k8s/${{ matrix.app }}-ingress.yaml
+          app_names: ${{ steps.load-inputs.outputs.app_names }}
           rollout_timeout: ${{ env.rollout_timeout }}
           image_tag: ${{ needs.version.outputs.version }}
           dockerhub_project: ${{ steps.load-inputs.outputs.dockerhub_project }}
-          app_name: ${{ matrix.app }}
-          secret_changed: ${{ steps.pull_config.outputs.secret_changed }} 
+          pull_etcd_config: ${{ steps.load-inputs.outputs.pull_etcd_config }}
+          etcd_key: ${{ steps.load-inputs.outputs.etcd_key }} 
