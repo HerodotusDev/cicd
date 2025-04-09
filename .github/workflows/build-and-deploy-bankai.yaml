@@ -41,7 +41,7 @@ jobs:
         run: |
           # Convert the app_names list to a JSON string
           APPS=${{ steps.load-app-names.outputs.app_names }}
-          MATRIX_APPS="{\"app\":$APPS}"
+          MATRIX_APPS='{"app":'$APPS'}'
           echo "matrix_apps=$MATRIX_APPS" >> $GITHUB_OUTPUT
         shell: bash
 
