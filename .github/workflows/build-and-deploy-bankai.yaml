@@ -21,7 +21,7 @@ jobs:
   load-app-names:
     runs-on: hero-arc-runners
     outputs:
-      matrix_apps: ${{ steps.set-matrix.outputs.matrix_apps }}
+      matrix_apps: ${{ steps.load-app-names.outputs.app_names }}
     steps:
       - name: Checkout Caller Repository
         uses: actions/checkout@v4
@@ -36,13 +36,6 @@ jobs:
         with:
           inputs_file: ${{ inputs.inputs_file }}
 
-      - name: Set Matrix Output
-        id: set-matrix
-        run: |
-          # Convert the app_names list to a JSON string
-          MATRIX_APPS='{"app":['$(echo "${{ env.app_names }}" | jq -R -s -c 'split("\n") | map(select(. != ""))')']}'
-          echo "matrix_apps=$MATRIX_APPS" >> $GITHUB_OUTPUT
-        shell: bash
 
   siren:
     runs-on: hero-arc-runners
@@ -90,7 +83,7 @@ jobs:
     needs: [load-app-names, version]
     runs-on: hero-arc-runners
     strategy:
-      matrix: ${{ fromJson(needs.load-app-names.outputs.matrix_apps) }}
+      matrix: ${{ needs.load-app-names.outputs.matrix_apps }}
     steps:
       - name: Checkout Caller Repository
         uses: actions/checkout@v4
@@ -142,7 +135,7 @@ jobs:
     needs: [load-app-names, version, create-git-tag, build-and-push-image]
     runs-on: hero-arc-runners
     strategy:
-      matrix: ${{ fromJson(needs.load-app-names.outputs.matrix_apps) }}
+      matrix: ${{ needs.load-app-names.outputs.matrix_apps }}
     if: always()
     outputs:
       secret_changed: ${{ steps.pull_config.outputs.secret_changed }}

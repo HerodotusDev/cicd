@@ -3,9 +3,7 @@
 ### Inputs file is 'branch sensitive' - eg. if running a workflow based on branch x - inputs file from branch x will be used. (opposite to workflows)
 
 namespace: example                                # namespace to be deploy  
-app_names:                                       # list of app names to deploy, can be single or multiple
-  - example
-  - example2
+app_names: ["example","example2"]                      # list of app names to deploy, can be single or multiple
 dockerhub_project: dataprocessor                  # name of the dockerhub project the image will be pushed to / pulled from
 #deployment_file: ./k8s/deployment.yaml           # path to the k8s deployment manifest  // has a default value
 #ingress_file: ./k8s/ingress.yaml                 # path to the k8s ingress manifest  // has a default value
