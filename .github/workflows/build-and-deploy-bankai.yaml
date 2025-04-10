@@ -83,7 +83,7 @@ jobs:
           file: ${{ env.version_file }}
 
   build-and-push-image:
-    needs: [load-app-names, version]
+    needs: [define-matrix, version]
     runs-on: hero-arc-runners
     strategy:
       matrix:
@@ -136,7 +136,7 @@ jobs:
           token: ${{ secrets.GITHUB_TOKEN }}
 
   deploy-staging:
-    needs: [load-app-names, version, create-git-tag, build-and-push-image]
+    needs: [define-matrix, version, create-git-tag, build-and-push-image]
     runs-on: hero-arc-runners
     strategy:
       matrix:
