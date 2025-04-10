@@ -52,21 +52,8 @@ runs:
 
             # Set app_names as output if it's the app_names key
             if [ "$key" = "app_names" ]; then
-              echo "Debug: Processing app_names value: $value"
-              
-              # Split the comma-separated string into an array
-              IFS=',' read -ra APPS <<< "$value"
-              
-              # Create JSON array with proper formatting
-              JSON_ARRAY='['
-              for ((i=0; i<${#APPS[@]}; i++)); do
-                if [ $i -gt 0 ]; then
-                  JSON_ARRAY="$JSON_ARRAY,"
-                fi
-                JSON_ARRAY="$JSON_ARRAY\"${APPS[$i]}\""
-              done
-              JSON_ARRAY="$JSON_ARRAY]"
-              
+              # Convert comma-separated string to JSON array
+              JSON_ARRAY=$(echo "$value" | jq -R -s -c 'split(",")')
               echo "Debug: Generated JSON array: $JSON_ARRAY"
               echo "app_names=$JSON_ARRAY" >> "$GITHUB_OUTPUT"
             fi
