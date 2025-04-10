@@ -52,9 +52,14 @@ runs:
 
             # Set app_names as output if it's the app_names key
             if [ "$key" = "app_names" ]; then
-              # Convert the array to the correct matrix format
-              MATRIX_APPS='{"app":['$(echo "$value" | sed 's/,/","/g' | sed 's/^/"/' | sed 's/$/"/')']}'
-              echo "app_names=$MATRIX_APPS" >> "$GITHUB_OUTPUT"
+              # If the value is already a JSON array, use it directly
+              if [[ "$value" =~ ^\[.*\]$ ]]; then
+                echo "app_names=$value" >> "$GITHUB_OUTPUT"
+              else
+                # Convert comma-separated string to JSON array
+                JSON_ARRAY='['$(echo "$value" | sed 's/,/","/g' | sed 's/^/"/' | sed 's/$/"/')']'
+                echo "app_names=$JSON_ARRAY" >> "$GITHUB_OUTPUT"
+              fi
             fi
           else
             echo "⚠️ Warning: Could not parse line: '$original_line'"

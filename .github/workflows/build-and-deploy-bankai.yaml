@@ -21,7 +21,7 @@ jobs:
   load-app-names:
     runs-on: hero-arc-runners
     outputs:
-      app_names: ${{ steps.load-app-names.outputs.app_names }}
+      matrix_apps: ${{ steps.load-app-names.outputs.app_names }}
     steps:
       - name: Checkout Caller Repository
         uses: actions/checkout@v4
@@ -83,8 +83,8 @@ jobs:
     needs: [load-app-names, version]
     runs-on: hero-arc-runners
     strategy:
-      matrix: 
-        app: ${{ needs.load-app-names.outputs.app_names }}
+      matrix:
+        app: ${{ fromJson(needs.load-app-names.outputs.app_names) }}
     steps:
       - name: Checkout Caller Repository
         uses: actions/checkout@v4
@@ -136,8 +136,8 @@ jobs:
     needs: [load-app-names, version, create-git-tag, build-and-push-image]
     runs-on: hero-arc-runners
     strategy:
-      matrix: 
-        app: ${{ needs.load-app-names.outputs.app_names }}
+      matrix:
+        app: ${{ fromJson(needs.load-app-names.outputs.app_names) }}
     if: always()
     outputs:
       secret_changed: ${{ steps.pull_config.outputs.secret_changed }}
