@@ -18,10 +18,10 @@ permissions:
   contents: write
 
 jobs:
-  load-app-names:
+  define-matrix:
     runs-on: hero-arc-runners
     outputs:
-      matrix_apps: ${{ steps.load-app-names.outputs.app_names }}
+      matrix_apps: ${{ steps.define-matrix.outputs.matrix_apps }}
     steps:
       - name: Checkout Caller Repository
         uses: actions/checkout@v4
@@ -36,7 +36,10 @@ jobs:
         with:
           inputs_file: ${{ inputs.inputs_file }}
 
-
+      - name: Define Colors
+        id: define-matrix
+        run: |
+          echo 'matrix_apps=[${{ env.app_names }}]' >> "$GITHUB_OUTPUT"
   siren:
     runs-on: hero-arc-runners
     if: false
@@ -84,7 +87,7 @@ jobs:
     runs-on: hero-arc-runners
     strategy:
       matrix:
-        app: ${{ fromJson(needs.load-app-names.outputs.app_names) }}
+        app: ${{ fromJson(needs.define-matrix.outputs.matrix_apps) }}
     steps:
       - name: Checkout Caller Repository
         uses: actions/checkout@v4
@@ -137,7 +140,7 @@ jobs:
     runs-on: hero-arc-runners
     strategy:
       matrix:
-        app: ${{ fromJson(needs.load-app-names.outputs.app_names) }}
+        app: ${{ fromJson(needs.define-matrix.outputs.matrix_apps) }}
     if: always()
     outputs:
       secret_changed: ${{ steps.pull_config.outputs.secret_changed }}

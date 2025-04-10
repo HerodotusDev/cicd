@@ -50,13 +50,6 @@ runs:
             echo "$key=$value" >> "$GITHUB_ENV"
             echo "Set $key=$value"
 
-            # Set app_names as output if it's the app_names key
-            if [ "$key" = "app_names" ]; then
-              # Convert comma-separated string to JSON array
-              JSON_ARRAY=$(echo "$value" | jq -R -s -c 'split(",")')
-              echo "Debug: Generated JSON array: $JSON_ARRAY"
-              echo "app_names=$JSON_ARRAY" >> "$GITHUB_OUTPUT"
-            fi
           else
             echo "⚠️ Warning: Could not parse line: '$original_line'"
           fi
