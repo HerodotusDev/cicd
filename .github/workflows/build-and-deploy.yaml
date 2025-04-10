@@ -8,7 +8,6 @@ on:
         required: false  
         default: ./k8s/cicd-inputs.yaml
 
-### those are defaults to be overwritten by inputs files
 env:
   deployment_file: ./k8s/deployment.yaml
   ingress_file: ./k8s/ingress.yaml
@@ -19,7 +18,28 @@ permissions:
   contents: write
 
 jobs:
+  define-matrix:
+    runs-on: hero-arc-runners
+    outputs:
+      matrix_apps: ${{ steps.define-matrix.outputs.matrix_apps }}
+    steps:
+      - name: Checkout Caller Repository
+        uses: actions/checkout@v4
+        with:
+          repository: ${{ github.repository }}
+          ref: ${{ github.ref }}
+          token: ${{ secrets.GITHUB_TOKEN }}
 
+      - name: Load App Names
+        id: load-app-names
+        uses: HerodotusDev/cicd/.github/actions/load-inputs@arc
+        with:
+          inputs_file: ${{ inputs.inputs_file }}
+
+      - name: Define apps matrix
+        id: define-matrix
+        run: |
+          echo 'matrix_apps=${{ env.app_names }}' >> "$GITHUB_OUTPUT"
 
   siren:
     runs-on: hero-arc-runners
@@ -32,35 +52,16 @@ jobs:
           password: ${{ env.ARC_DOCKER_PASSWORD }}
 
       - name: Pull Siren Image from Registry
-        run: docker pull inputs.siren_image}
+        run: docker pull ${{ inputs.siren_image }}
 
       - name: Run Siren Check
         run: |
-          docker run --rm inputs.siren_image|| exit 1
+          docker run --rm ${{ inputs.siren_image }} || exit 1
         shell: bash
 
-  version:  
+  version:
     outputs:
       version: ${{ steps.version.outputs.version }}
-    runs-on: hero-arc-runners
-    steps:
-      - name: Checkout Caller Repository
-        uses: actions/checkout@v4
-        with:
-          repository: ${{ github.repository }}
-          ref: ${{ github.ref }}
-          token: ${{ secrets.GITHUB_TOKEN }}
-
-
-
-      - name: Extract Version
-        uses: HerodotusDev/cicd/.github/actions/extract-version@main
-        id: version
-        with:
-          file: ${{ env.version_file }}
-
-  build-and-push-image:
-    needs: [version]
     runs-on: hero-arc-runners
     steps:
       - name: Checkout Caller Repository
@@ -76,14 +77,41 @@ jobs:
         with:
           inputs_file: ${{ inputs.inputs_file }}
 
+      - name: Extract Version
+        uses: HerodotusDev/cicd/.github/actions/extract-version@arc
+        id: version
+        with:
+          file: ${{ env.version_file }}
+
+  build-and-push-image:
+    needs: [define-matrix, version]
+    runs-on: hero-arc-runners
+    strategy:
+      matrix:
+        app: ${{ fromJson(needs.define-matrix.outputs.matrix_apps) }}
+    steps:
+      - name: Checkout Caller Repository
+        uses: actions/checkout@v4
+        with:
+          repository: ${{ github.repository }}
+          ref: ${{ github.ref }}
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Load Inputs from YAML
+        id: load-inputs
+        uses: HerodotusDev/cicd/.github/actions/load-inputs@arc
+        with:
+          inputs_file: ${{ inputs.inputs_file }}
+
       - name: Build and push image
-        uses: HerodotusDev/cicd/.github/actions/build-and-push-image@main
+        uses: HerodotusDev/cicd/.github/actions/build-and-push-image@arc
         with:
           dockerhub_project: ${{ env.dockerhub_project }}
-          app_name: ${{ env.app_name }}
+          app_name: ${{ matrix.app }}
           version: ${{ needs.version.outputs.version }}
           docker_username: ${{ env.ARC_DOCKER_USERNAME }}
           docker_password: ${{ env.ARC_DOCKER_PASSWORD }}
+          dockerfile: ./docker/Dockerfile.${{ matrix.app }}
 
   create-git-tag:
     needs: [version, build-and-push-image]
@@ -103,50 +131,53 @@ jobs:
           inputs_file: ${{ inputs.inputs_file }}
 
       - name: Create Git tag
-        uses: HerodotusDev/cicd/.github/actions/create-git-tag@main
+        uses: HerodotusDev/cicd/.github/actions/create-git-tag@arc
         with:
           tag: ${{ needs.version.outputs.version }}
           token: ${{ secrets.GITHUB_TOKEN }}
 
   deploy-staging:
-    needs: [version, create-git-tag, build-and-push-image]
+    needs: [define-matrix, version, create-git-tag, build-and-push-image]
     runs-on: hero-arc-runners
+    strategy:
+      matrix:
+        app: ${{ fromJson(needs.define-matrix.outputs.matrix_apps) }}
     if: always()
     outputs:
       secret_changed: ${{ steps.pull_config.outputs.secret_changed }}
-    steps:      
+    steps:
       - name: Checkout Caller Repository
         uses: actions/checkout@v4
         with:
           repository: ${{ github.repository }}
           ref: ${{ github.ref }}
-          token: ${{ secrets.GITHUB_TOKEN }}    
+          token: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Load Inputs from YAML
         id: load-inputs
         uses: HerodotusDev/cicd/.github/actions/load-inputs@arc
         with:
           inputs_file: ${{ inputs.inputs_file }}
-          
+
       - name: Pull config from etcd
         id: pull_config
         uses: HerodotusDev/cicd/.github/actions/pull-etcd-config@arc
         if: ${{ env.pull_etcd_config == 'true' }}
         with:
           namespace: ${{ env.namespace }}
-          app_name: ${{ env.app_name }}
+          app_name: ${{ matrix.app }}
           etcd_user: ${{ env.ARC_ETCD_USER }}
           etcd_password: ${{ env.ARC_ETCD_PASSWORD }}
-          etcd_key: ${{ env.etcd_key}}
+          etcd_key: ${{ env.namespace }}/${{ matrix.app }}/envs/${{ env.etcd_key }}
 
       - name: Deploy to Kubernetes
         uses: HerodotusDev/cicd/.github/actions/deploy-to-k8s@arc
         with:
           namespace: ${{ env.namespace }}
-          deployment_file: ${{ env.deployment_file }}
-          ingress_file: ${{ env.ingress_file }}
+          deployment_file: ./k8s/${{ matrix.app }}-deployment.yaml
+          ingress_file: ./k8s/${{ matrix.app }}-ingress.yaml
           rollout_timeout: ${{ env.rollout_timeout }}
           image_tag: ${{ needs.version.outputs.version }}
           dockerhub_project: ${{ env.dockerhub_project }}
-          app_name: ${{ env.app_name }}          
-          secret_changed: ${{ steps.pull_config.outputs.secret_changed }}
+          app_name: ${{ matrix.app }}
+          secret_changed: ${{ steps.pull_config.outputs.secret_changed }} 
