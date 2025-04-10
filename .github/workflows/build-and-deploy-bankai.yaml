@@ -40,8 +40,7 @@ jobs:
         id: set-matrix
         run: |
           # Convert the app_names list to a JSON string
-          APPS=${{ env.app_names }}
-          MATRIX_APPS="{\"app\":$APPS}"
+          MATRIX_APPS='{"app":['$(echo "${{ env.app_names }}" | jq -R -s -c 'split("\n") | map(select(. != ""))')']}'
           echo "matrix_apps=$MATRIX_APPS" >> $GITHUB_OUTPUT
         shell: bash
 
