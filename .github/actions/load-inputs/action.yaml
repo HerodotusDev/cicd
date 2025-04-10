@@ -7,10 +7,16 @@ inputs:
     required: true
     default: "workflow-inputs.yaml"
 
+outputs:
+  app_names:
+    description: "The app_names value from the inputs file"
+    value: ${{ steps.load-inputs.outputs.app_names }}
+
 runs:
   using: "composite"
   steps:
     - name: Load Inputs and Set Environment Variables
+      id: load-inputs
       run: |
         if [ ! -f "${{ inputs.inputs_file }}" ]; then
           echo "❌ Error: File ${{ inputs.inputs_file }} not found!"
@@ -43,6 +49,11 @@ runs:
             # Set the environment variable
             echo "$key=$value" >> "$GITHUB_ENV"
             echo "Set $key=$value"
+
+            # Set app_names as output if it's the app_names key
+            if [ "$key" = "app_names" ]; then
+              echo "app_names=$value" >> "$GITHUB_OUTPUT"
+            fi
           else
             echo "⚠️ Warning: Could not parse line: '$original_line'"
           fi
