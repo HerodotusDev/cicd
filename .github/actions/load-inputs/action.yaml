@@ -52,7 +52,9 @@ runs:
 
             # Set app_names as output if it's the app_names key
             if [ "$key" = "app_names" ]; then
-              echo "app_names=$value" >> "$GITHUB_OUTPUT"
+              # Convert the array to the correct matrix format
+              MATRIX_APPS='{"app":['$(echo "$value" | sed 's/,/","/g' | sed 's/^/"/' | sed 's/$/"/')']}'
+              echo "app_names=$MATRIX_APPS" >> "$GITHUB_OUTPUT"
             fi
           else
             echo "⚠️ Warning: Could not parse line: '$original_line'"
