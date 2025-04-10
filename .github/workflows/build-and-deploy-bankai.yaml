@@ -21,7 +21,7 @@ jobs:
   load-app-names:
     runs-on: hero-arc-runners
     outputs:
-      matrix_apps: ${{ steps.load-app-names.outputs.app_names }}
+      matrix_apps: ${{ steps.set-matrix.outputs.matrix_apps }}
     steps:
       - name: Checkout Caller Repository
         uses: actions/checkout@v4
@@ -36,6 +36,13 @@ jobs:
         with:
           inputs_file: ${{ inputs.inputs_file }}
 
+      - name: Set Matrix Output
+        id: set-matrix
+        run: |
+          # Use the app_names directly as it's already in JSON array format
+          MATRIX_APPS='{"app":'${{ steps.load-app-names.outputs.app_names }}'}'
+          echo "matrix_apps=$MATRIX_APPS" >> $GITHUB_OUTPUT
+        shell: bash
 
   siren:
     runs-on: hero-arc-runners
