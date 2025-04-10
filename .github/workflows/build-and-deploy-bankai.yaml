@@ -39,8 +39,8 @@ jobs:
       - name: Define Colors
         id: define-matrix
         run: |
-          #echo 'matrix_apps=${{ env.app_names }}' >> "$GITHUB_OUTPUT"
-          echo 'matrix_apps=["bankai-api", "bankai-daemon"]' >> "$GITHUB_OUTPUT"
+          echo 'matrix_apps=${{ env.app_names }}' >> "$GITHUB_OUTPUT"
+          #echo 'matrix_apps=["bankai-api", "bankai-daemon"]' >> "$GITHUB_OUTPUT"
   siren:
     runs-on: hero-arc-runners
     if: false
