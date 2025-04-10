@@ -52,14 +52,23 @@ runs:
 
             # Set app_names as output if it's the app_names key
             if [ "$key" = "app_names" ]; then
-              # If the value is already a JSON array, use it directly
-              if [[ "$value" =~ ^\[.*\]$ ]]; then
-                echo "app_names=$value" >> "$GITHUB_OUTPUT"
-              else
-                # Convert comma-separated string to JSON array
-                JSON_ARRAY='['$(echo "$value" | sed 's/,/","/g' | sed 's/^/"/' | sed 's/$/"/')']'
-                echo "app_names=$JSON_ARRAY" >> "$GITHUB_OUTPUT"
-              fi
+              echo "Debug: Processing app_names value: $value"
+              
+              # Split the comma-separated string into an array
+              IFS=',' read -ra APPS <<< "$value"
+              
+              # Create JSON array with proper formatting
+              JSON_ARRAY='['
+              for ((i=0; i<${#APPS[@]}; i++)); do
+                if [ $i -gt 0 ]; then
+                  JSON_ARRAY="$JSON_ARRAY,"
+                fi
+                JSON_ARRAY="$JSON_ARRAY\"${APPS[$i]}\""
+              done
+              JSON_ARRAY="$JSON_ARRAY]"
+              
+              echo "Debug: Generated JSON array: $JSON_ARRAY"
+              echo "app_names=$JSON_ARRAY" >> "$GITHUB_OUTPUT"
             fi
           else
             echo "⚠️ Warning: Could not parse line: '$original_line'"
