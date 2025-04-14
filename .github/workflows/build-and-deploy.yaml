@@ -3,14 +3,12 @@ name: Build & deploy
 on:
   workflow_call:
     inputs:    
-      inputs_file:
+      k8s_env:
         type: string
         required: false  
-        default: ./k8s/cicd-inputs.yaml
+        default: stage
 
 env:
-  deployment_file: ./k8s/deployment.yaml
-  ingress_file: ./k8s/ingress.yaml
   rollout_timeout: 300       
   version_file: ./package.json  
   
@@ -34,7 +32,7 @@ jobs:
         id: load-app-names
         uses: HerodotusDev/cicd/.github/actions/load-inputs@arc
         with:
-          inputs_file: ${{ inputs.inputs_file }}
+          inputs_file: ./k8s/${{ inputs.k8s_env }}/cicd-inputs.yaml
 
       - name: Define apps matrix
         id: define-matrix
@@ -75,7 +73,7 @@ jobs:
         id: load-inputs
         uses: HerodotusDev/cicd/.github/actions/load-inputs@arc
         with:
-          inputs_file: ${{ inputs.inputs_file }}
+          inputs_file: ./k8s/${{ inputs.k8s_env }}/cicd-inputs.yaml
 
       - name: Extract Version
         uses: HerodotusDev/cicd/.github/actions/extract-version@arc
@@ -101,7 +99,7 @@ jobs:
         id: load-inputs
         uses: HerodotusDev/cicd/.github/actions/load-inputs@arc
         with:
-          inputs_file: ${{ inputs.inputs_file }}
+          inputs_file: ./k8s/${{ inputs.k8s_env }}/cicd-inputs.yaml
 
       - name: Build and push image
         uses: HerodotusDev/cicd/.github/actions/build-and-push-image@arc
@@ -128,7 +126,7 @@ jobs:
         id: load-inputs
         uses: HerodotusDev/cicd/.github/actions/load-inputs@arc
         with:
-          inputs_file: ${{ inputs.inputs_file }}
+          inputs_file: ./k8s/${{ inputs.k8s_env }}/cicd-inputs.yaml
 
       - name: Create Git tag
         uses: HerodotusDev/cicd/.github/actions/create-git-tag@arc
@@ -157,7 +155,7 @@ jobs:
         id: load-inputs
         uses: HerodotusDev/cicd/.github/actions/load-inputs@arc
         with:
-          inputs_file: ${{ inputs.inputs_file }}
+          inputs_file: ./k8s/${{ inputs.k8s_env }}/cicd-inputs.yaml
 
       - name: Pull config from etcd
         id: pull_config
@@ -174,8 +172,8 @@ jobs:
         uses: HerodotusDev/cicd/.github/actions/deploy-to-k8s@arc
         with:
           namespace: ${{ env.namespace }}
-          deployment_file: ./k8s/${{ matrix.app }}-deployment.yaml
-          ingress_file: ./k8s/${{ matrix.app }}-ingress.yaml
+          deployment_file: ./k8s/${{ inputs.k8s_env }}/${{ matrix.app }}-deployment.yaml
+          ingress_file: ./k8s/${{ inputs.k8s_env }}/${{ matrix.app }}-ingress.yaml
           rollout_timeout: ${{ env.rollout_timeout }}
           image_tag: ${{ needs.version.outputs.version }}
           dockerhub_project: ${{ env.dockerhub_project }}
