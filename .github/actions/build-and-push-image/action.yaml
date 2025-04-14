@@ -78,6 +78,7 @@ runs:
         push: true
         cache-from: type=gha
         cache-to: type=gha,mode=max
+        network: host
         tags: |
           ${{ env.IMAGE }}:latest
           ${{ env.IMAGE }}:${{ inputs.version }}
