@@ -12,6 +12,8 @@ spec:
       labels:
         app: example
     spec:
+      imagePullSecrets:
+        - name: dockerhub-secret    
       containers:
         - name: example
           ### placeholder to be set by cicd pipeline
