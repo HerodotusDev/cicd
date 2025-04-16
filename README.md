@@ -13,6 +13,27 @@ Trigger conditions can be set per repo in workflow file
 
 [ How to set triggers ](https://docs.github.com/en/actions/writing-workflows/choosing-when-your-workflow-runs/events-that-trigger-workflows)
 
+## Defining k8s env
+
+
+k8s_env variable in workflow defines which dir under k8s will be used as base for deployment.
+
+e.g.
+
+```yaml
+k8s_env: stage
+```
+will make cicd use k8s/stage dir 
+
+```yaml
+k8s_env: prod
+```
+will make cicd use k8s/prod dir 
+```yaml
+k8s_env: leftmywaller
+```
+will make cicd use k8s/letmywallet dir
+
 
 ## Build and deploy 
 
@@ -90,7 +111,6 @@ example-deployment.yaml
 ```yaml
 example-ingress.yaml
 ```
-
 
 
 
