@@ -8,7 +8,6 @@ To import workflows, copy the [examples/workflows](./examples/workflows) directo
 While doing initial ci commits, include a [ci skip ] in commit message, to skip running the build-and-deploy workflow.
   
   
-```
 
 Trigger conditions can be set per repo in workflow file 
 
@@ -41,11 +40,58 @@ Trigger conditions can be set per repo in workflow file
   Deploys given image to k8s
 
 
+## Dockerfile
+
+To build a dockerimage a Dockerfile is needed.
+
+It has to situated in [examples/docker](./examples/docker) dir
+
+and be named in convertion of 
+
+```yaml
+Dockerfile.app_name
+```
+corresponing to app_names provided in [cicd-inputs](./examples/k8s/cicd-inputs.yaml)
+
+e.g.
+
+```yaml
+Dockerfile.example
+```
+
+in case of monorepo, multiple Dockerfiles have to be provided, corresponding to app_names e.g.
+
+```yaml
+Dockerfile.example1
+Dockerfile.example2
+```
 ## Importing K8s templates
 
 To enable k8s deploy, copy the [examples/k8s](./examples/k8s) directory to you repo root dir.
 
 [cicd-inputs](./examples/k8s/cicd-inputs.yaml) file specifies variables to be passed to following pipelines and has to be set.
+
+In case of monorepo it required to specify app_name list in format:
+
+```yaml
+app_names: ["example1","example2"]
+```
+or in case of single app
+
+```yaml
+app_names: ["example1"]
+```
+
+Manifest files have to named in convention of app_name-object.yaml  e.g.
+
+```yaml
+example-deployment.yaml
+```
+```yaml
+example-ingress.yaml
+```
+
+
 
 
 ## Enabling etcd pull
@@ -55,7 +101,7 @@ To enable pulling configuration from etcd, following line have to be added / unc
 The key path will be determined by namespace and app name e.g
 
   example_namespace/example_app/envs/example_key
-  
+
 ```yaml
 
 pull_etcd_config: true              # toggle etcd pull flag
