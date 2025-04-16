@@ -6,23 +6,6 @@
 To import workflows, copy the [examples/workflows](./examples/workflows) directory to you repo .github dir on main branch.
 
 While doing initial ci commits, include a [ci skip ] in commit message, to skip running the build-and-deploy workflow.
-
-Workflows need following secrets to be set on repo level:
-
-```yaml 
-
-  DOCKER_USERNAME
-
-  DOCKER_PASSWORD
-
-  KUBE_CONFIG
-
-  ETCD_USER  # only when using etcd pull
-
-  ETCD_PASSWORD # only when using etcd pull
-
-  ETCD_HOST
-  
   
   
 ```
@@ -69,10 +52,14 @@ To enable k8s deploy, copy the [examples/k8s](./examples/k8s) directory to you r
 
 To enable pulling configuration from etcd, following line have to be added / uncommented from [cicd-inputs](./examples/k8s/cicd-inputs.yaml):
 
+The key path will be determined by namespace and app name e.g
+
+  example_namespace/example_app/envs/example_key
+  
 ```yaml
 
 pull_etcd_config: true              # toggle etcd pull flag
-etcd_key: /example/envs/.env.stage  # key to be pulled 
+etcd_key: .env.stage                # key to be pulled 
 
 ```
 The file to be pulled has to be in key=value format coded as yaml.
