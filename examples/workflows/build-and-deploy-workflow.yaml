@@ -15,3 +15,6 @@ permissions:
 jobs:
   call-deploy:
     uses: HerodotusDev/cicd/.github/workflows/build-and-deploy.yaml@arc
+    with:
+      k8s_env: stage
+
