@@ -102,7 +102,7 @@ jobs:
           inputs_file: ./k8s/${{ inputs.k8s_env }}/cicd-inputs.yaml
 
       - name: Build and push image
-        uses: HerodotusDev/cicd/.github/actions/build-and-push-image@arc_network
+        uses: HerodotusDev/cicd/.github/actions/build-and-push-image@arc
         with:
           dockerhub_project: ${{ env.dockerhub_project }}
           app_name: ${{ matrix.app }}
