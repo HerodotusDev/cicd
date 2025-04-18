@@ -43,7 +43,7 @@ runs:
           -e ETCD_HOST="etcd.etcd.svc.cluster.local:2379" \
           -e ETCD_USER="${{ inputs.ETCD_USER }}" \
           -e ETCD_PASSWORD="${{ inputs.ETCD_PASSWORD }}" \
-          -e ETCD_KEY="${{ inputs.namespace }}/${{ inputs.app_name }}/envs/${{ inputs.ETCD_KEY }}" \
+          -e ETCD_KEY="/${{ inputs.namespace }}/${{ inputs.app_name }}/envs/${{ inputs.ETCD_KEY }}" \
           -e APP_NAME="${{ inputs.app_name }}" \
           -e NAMESPACE="${{ inputs.namespace }}" \
           -v ${{ github.workspace }}/output:/output \
