@@ -20,7 +20,7 @@ jobs:
     runs-on: hero-arc-runners
     outputs:
       matrix_apps: ${{ steps.define-matrix.outputs.matrix_apps }}
-      matix_init: ${{ steps.define-matrix-init.outputs.matrix_init }}
+      matrix_init: ${{ steps.define-matrix-init.outputs.matrix_init }}
     steps:
       - name: Checkout Caller Repository
         uses: actions/checkout@v4
