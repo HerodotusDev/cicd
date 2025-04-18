@@ -145,7 +145,7 @@ jobs:
     runs-on: hero-arc-runners
     strategy:
       matrix:
-        app: ${{ fromJson(needs.define-matrix.outputs.matix_init) }}
+        app: ${{ fromJson(needs.define-matrix.outputs.matrix_init) }}
     if: always()
 
     steps:
