@@ -20,6 +20,7 @@ jobs:
     runs-on: hero-arc-runners
     outputs:
       matrix_apps: ${{ steps.define-matrix.outputs.matrix_apps }}
+      matix_init: ${{ steps.define-matrix-init.outputs.matrix_init }}
     steps:
       - name: Checkout Caller Repository
         uses: actions/checkout@v4
@@ -38,6 +39,11 @@ jobs:
         id: define-matrix
         run: |
           echo 'matrix_apps=${{ env.app_names }}' >> "$GITHUB_OUTPUT"
+
+      - name: Define apps matrix
+        id: define-matrix-init
+        run: |
+          echo 'matrix_init=${{ env.init_pods }}' >> "$GITHUB_OUTPUT"          
 
   siren:
     runs-on: hero-arc-runners
@@ -134,8 +140,51 @@ jobs:
           tag: ${{ needs.version.outputs.version }}
           token: ${{ secrets.GITHUB_TOKEN }}
 
-  deploy-staging:
+  deploy-init-pods:
     needs: [define-matrix, version, create-git-tag, build-and-push-image]
+    runs-on: hero-arc-runners
+    strategy:
+      matrix:
+        app: ${{ fromJson(needs.define-matrix.outputs.matix_init) }}
+    if: always()
+
+    steps:
+      - name: Checkout Caller Repository
+        uses: actions/checkout@v4
+        with:
+          repository: ${{ github.repository }}
+          ref: ${{ github.ref }}
+          token: ${{ secrets.GITHUB_TOKEN }}  
+                  
+      - name: Load Inputs from YAML
+        id: load-inputs
+        uses: HerodotusDev/cicd/.github/actions/load-inputs@arc
+        with:
+          inputs_file: ./k8s/${{ inputs.k8s_env }}/cicd-inputs.yaml          
+
+      - name: Set up kubectl
+        uses: azure/setup-kubectl@v4
+        with:
+          version: "v1.32.0"
+        
+      - name: Update deployment YAML with image tag
+        run: |
+          sed -i "s|<IMAGE>|${{ env.dockerhub_project }}/${{ matrix.app }}:${{ needs.version.outputs.version }}|g" ""
+        shell: bash
+          
+      - name: Deploy Deployment YAML (if exists)
+        run: |
+          if [ -f "./k8s/${{ inputs.k8s_env }}/${{ matrix.app }}-pod.yaml" ]; then
+            echo "Deployment file exists. Applying manifest..."
+            kubectl apply --namespace "${{ env.namespace }}" -f "./k8s/${{ inputs.k8s_env }}/${{ matrix.app }}-pod.yaml"
+          else
+            echo "No Deployment file found. Skipping deployment."
+          fi
+        shell: bash   
+
+        
+  deploy-staging:
+    needs: [define-matrix, version, create-git-tag, build-and-push-image, deploy-init-pods]
     runs-on: hero-arc-runners
     strategy:
       matrix:
@@ -166,7 +215,7 @@ jobs:
           app_name: storage-proofs
           etcd_user: ${{ env.ARC_ETCD_USER }}
           etcd_password: ${{ env.ARC_ETCD_PASSWORD }}
-          etcd_key: ${{ env.etcd_key }}
+          etcd_key: ${{ env.etcd_key }}       
 
       - name: Deploy to Kubernetes
         uses: HerodotusDev/cicd/.github/actions/deploy-to-k8s@arc
