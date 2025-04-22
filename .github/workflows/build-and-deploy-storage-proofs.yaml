@@ -90,7 +90,6 @@ jobs:
   build-and-push-image:
     needs: [define-matrix, version]
     runs-on: hero-arc-runners
-    if: false
     strategy:
       matrix:
         app: ${{ fromJson(needs.define-matrix.outputs.matrix_apps) }}
@@ -190,7 +189,7 @@ jobs:
     strategy:
       matrix:
         app: ${{ fromJson(needs.define-matrix.outputs.matrix_apps) }}
-    if: false
+    if: always()
     outputs:
       secret_changed: ${{ steps.pull_config.outputs.secret_changed }}
     steps:
