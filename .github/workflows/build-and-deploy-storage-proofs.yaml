@@ -90,6 +90,7 @@ jobs:
   build-and-push-image:
     needs: [define-matrix, version]
     runs-on: hero-arc-runners
+    if: false
     strategy:
       matrix:
         app: ${{ fromJson(needs.define-matrix.outputs.matrix_apps) }}
