@@ -166,7 +166,18 @@ jobs:
         uses: azure/setup-kubectl@v4
         with:
           version: "v1.32.0"
-        
+
+      - name: Pull config from etcd
+        id: pull_config
+        uses: HerodotusDev/cicd/.github/actions/pull-etcd-config@arc
+        if: ${{ env.pull_etcd_config == 'true' }}
+        with:
+          namespace: ${{ env.namespace }}
+          app_name: ${{ matrix.app }}
+          etcd_user: ${{ env.ARC_ETCD_USER }}
+          etcd_password: ${{ env.ARC_ETCD_PASSWORD }}
+          etcd_key: ${{ env.etcd_key }}
+
       - name: Update deployment YAML with image tag
         run: |
           sed -i "s|<IMAGE>|${{ env.dockerhub_project }}/${{ matrix.app }}:${{ needs.version.outputs.version }}|g" "./k8s/${{ inputs.k8s_env }}/${{ matrix.app }}-pod.yaml"
