@@ -182,6 +182,14 @@ jobs:
           fi
         shell: bash   
 
+      - name: Wait for Pod to complete
+        run: |
+          kubectl wait \
+            --for=jsonpath='{.status.phase}'=Succeeded \
+            pod/${{ matrix.app}} \
+            --namespace "${{ env.namespace }}" \
+            --timeout=${{ env.rollout_timeout }}s
+        shell: bash
         
   deploy-staging:
     needs: [define-matrix, version, create-git-tag, build-and-push-image, deploy-init-pods]
