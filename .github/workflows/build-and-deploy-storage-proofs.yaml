@@ -189,7 +189,7 @@ jobs:
     strategy:
       matrix:
         app: ${{ fromJson(needs.define-matrix.outputs.matrix_apps) }}
-    if: always()
+    if: false
     outputs:
       secret_changed: ${{ steps.pull_config.outputs.secret_changed }}
     steps:
