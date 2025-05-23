@@ -5,7 +5,7 @@ inputs:
   etcd_host:
     description: 'ETCD endpoint'
     required: false
-    default: https://config.api.herodotus.cloud:2379
+    default: https://etcd.etcd.svc.cluster.local:2379
   etcd_user:
     description: 'ETCD username'
     required: true
@@ -71,9 +71,9 @@ runs:
       shell: bash
       run: |
         # Check if secret exists
-        if kubectl get secret ${{ inputs.app_name }}-config -n ${{ inputs.namespace }} &>/dev/null; then
+        if kubectl get secret ${{ inputs.app_name }}-secret -n ${{ inputs.namespace }} &>/dev/null; then
           # Secret exists, get its hash annotation
-          CURRENT_HASH=$(kubectl get secret ${{ inputs.app_name }}-config -n ${{ inputs.namespace }} -o jsonpath='{.metadata.annotations.secret-hash}' 2>/dev/null || echo "")
+          CURRENT_HASH=$(kubectl get secret ${{ inputs.app_name }}-secret -n ${{ inputs.namespace }} -o jsonpath='{.metadata.annotations.secret-hash}' 2>/dev/null || echo "")
           if [ -z "$CURRENT_HASH" ]; then
             # Secret exists but no hash annotation - treat as changed
             echo "Secret exists but has no hash annotation - marking as changed"
