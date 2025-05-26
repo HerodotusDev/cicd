@@ -1,0 +1,83 @@
+# .github/actions/k8s-deploy/action.yml
+name: "Deploy on K8s"
+description: "Deploys Kubernetes resources using kubectl."
+inputs:
+  service_account_token:
+    description: "Service account token for Kubernetes authentication."
+    required: true
+  cluster_url:
+    description: "Kubernetes API server URL."
+    required: true
+  namespace:
+    description: "Kubernetes namespace to deploy to."
+    required: true
+  deployment_file:
+    description: "Path to the deployment YAML file."
+    required: true
+  ingress_file:
+    description: "Path to the ingress YAML file."
+    required: true
+  rollout_timeout:
+    description: "Rollout timeout for the deployment (e.g., 500s)."
+    required: false
+    default: "500"
+  image_tag:
+    description: "Image tag to deployed."
+    required: true
+    default: latest
+  dockerhub_project:
+    description: "The Docker Hub project (or organization/repository prefix) (e.g. myorg)"
+    required: true
+  app_name:
+    description: "The application name to form the image name."
+    required: true    
+  secret_changed:
+    description: "Whether the secret has changed and deployment needs restart"
+    required: false
+    default: "false"
+
+runs:
+  using: "composite"
+  steps:
+    - name: Checkout repository
+      uses: actions/checkout@v3
+
+    - name: Set up kubectl
+      uses: azure/setup-kubectl@v4
+      with:
+        version: "v1.32.0"
+
+      
+    - name: delete Deployment YAML (if exists)
+      run: |
+        if [ -f "${{ inputs.deployment_file }}" ]; then
+          echo "Deployment file exists. Applying manifest..."
+          kubectl delete --namespace "${{ inputs.namespace }}" -f "${{ inputs.deployment_file }}"
+        else
+          echo "No Deployment file found. Skipping deployment."
+        fi
+      shell: bash
+
+    - name: delete Ingress YAML (if exists)
+      run: |
+        if [ -f "${{ inputs.ingress_file }}" ]; then
+          echo "Ingress file exists. Applying manifest..."
+          kubectl delete  --namespace "${{ inputs.namespace }}" -f "${{ inputs.ingress_file }}"
+        else
+          echo "No Ingress file found. Skipping deployment."
+        fi
+      shell: bash
+
+    - name: Delete secret (no-fail)
+      run: |
+        kubectl delete secret "${{ inputs.app_name }}-secret" \
+          -n "${{ inputs.namespace }}" \
+          --ignore-not-found
+      shell: bash
+
+    - name: Delete ConfigMap (no-fail)
+      run: |
+        kubectl delete configmap "${{ inputs.app_name }}-configmap" \
+          -n "${{ inputs.namespace }}" \
+          --ignore-not-found
+      shell: bash

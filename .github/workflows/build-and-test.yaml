@@ -180,6 +180,20 @@ jobs:
           app_name: ${{ matrix.app }}
           secret_changed: ${{ steps.pull_config.outputs.secret_changed }} 
 
+      - name: Wait for restart to complete
+        if: inputs.secret_changed == 'true'
+        run: |
+          kubectl delete deploy atlantic -n ${{ env.namespace }}
 
-  
-  
+      - name: Delete test stuff
+        uses: HerodotusDev/cicd/.github/actions/deploy-to-k8s@test_env
+        if: ${{ env.k8s_env == 'test' }}
+        with:
+          namespace: ${{ env.namespace }}
+          deployment_file: ./k8s/${{ inputs.k8s_env }}/${{ matrix.app }}-deployment.yaml
+          ingress_file: ./k8s/${{ inputs.k8s_env }}/${{ matrix.app }}-ingress.yaml
+          rollout_timeout: ${{ env.rollout_timeout }}
+          image_tag: ${{ needs.version.outputs.version }}
+          dockerhub_project: ${{ env.dockerhub_project }}
+          app_name: ${{ matrix.app }}
+          secret_changed: ${{ steps.pull_config.outputs.secret_changed }}           
