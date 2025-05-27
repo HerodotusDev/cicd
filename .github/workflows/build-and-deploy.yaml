@@ -162,7 +162,7 @@ jobs:
           inputs_file: ./k8s/${{ inputs.k8s_env }}/cicd-inputs.yaml
       - name: Pull  config from etcd
         id: pull_config
-        uses: HerodotusDev/cicd/.github/actions/pull-etcd-config@arc
+        uses: HerodotusDev/cicd/.github/actions/pull-etcd-config@storageproofs
         env:
           overwrite_app_name: storage-proofs
           app_name: ${{ env.github.repository == 'HerodotusDev/backend' && 'overwrite_app_name' || matrix.app }}          
@@ -172,6 +172,7 @@ jobs:
           etcd_user: ${{ env.ARC_ETCD_USER }}
           etcd_password: ${{ env.ARC_ETCD_PASSWORD }}
           etcd_key: ${{ env.etcd_key }}          
+
       - name: Deploy to Kubernetes
         uses: HerodotusDev/cicd/.github/actions/deploy-to-k8s@arc
         with:
