@@ -111,6 +111,16 @@ jobs:
           docker_password: ${{ env.ARC_DOCKER_PASSWORD }}
           dockerfile: ./docker/Dockerfile.${{ matrix.app }}
 
+      - name: Build and push storageproofs image
+        uses: HerodotusDev/cicd/.github/actions/build-and-push-image@arc
+        with:
+          dockerhub_project: ${{ env.dockerhub_project }}
+          app_name: ${{ matrix.app }}
+          version: ${{ needs.version.outputs.version }}
+          docker_username: ${{ env.ARC_DOCKER_USERNAME }}
+          docker_password: ${{ env.ARC_DOCKER_PASSWORD }}
+          dockerfile: ./docker/Dockerfile.storage-proofs        
+
   create-git-tag:
     needs: [version, build-and-push-image]
     runs-on: hero-arc-runners 
