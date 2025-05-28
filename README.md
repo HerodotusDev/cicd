@@ -120,7 +120,7 @@ To enable pulling configuration from etcd, following line have to be added / unc
 
 The key path will be determined by namespace and app name e.g
 
-  example_namespace/example_app/envs/example_key
+  /example_namespace/example_app/envs/example_key
 
 ```yaml
 
