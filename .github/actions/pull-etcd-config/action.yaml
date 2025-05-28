@@ -5,7 +5,7 @@ inputs:
   etcd_host:
     description: 'ETCD endpoint'
     required: false
-    default: https://config.api.herodotus.cloud:2379
+    default: https://etcd.etcd.svc.cluster.local:2379
   etcd_user:
     description: 'ETCD username'
     required: true
@@ -22,9 +22,17 @@ inputs:
   app_name:
     description: 'Application name'
     required: true
-  kube_config:
-    description: 'Kubeconfig content'
+  service_account_token:
+    description: "Service account token for Kubernetes authentication."
     required: true
+
+outputs:
+  secret_changed:
+    description: "Whether the secret content has changed"
+    value: ${{ steps.check_secret_change.outputs.changed }}
+  secret_hash:
+    description: "Hash of the secret content"
+    value: ${{ steps.compute_hash.outputs.hash }}
 
 runs:
   using: "composite"
@@ -32,10 +40,10 @@ runs:
     - name: Pull and Run Secret Preparation Container
       run: |
         docker run --rm \
-          -e ETCD_HOST="${{ inputs.ETCD_HOST }}" \
+          -e ETCD_HOST="etcd.etcd.svc.cluster.local:2379" \
           -e ETCD_USER="${{ inputs.ETCD_USER }}" \
           -e ETCD_PASSWORD="${{ inputs.ETCD_PASSWORD }}" \
-          -e ETCD_KEY="${{ inputs.ETCD_KEY }}" \
+          -e ETCD_KEY="/${{ inputs.namespace }}/${{ inputs.app_name }}/envs/${{ inputs.ETCD_KEY }}" \
           -e APP_NAME="${{ inputs.app_name }}" \
           -e NAMESPACE="${{ inputs.namespace }}" \
           -v ${{ github.workspace }}/output:/output \
@@ -51,27 +59,48 @@ runs:
       with:
         version: "v1.32.0"
 
-    - name: Configure kubectl
-      run: |
-        mkdir -p ~/.kube
-        echo "${{ inputs.KUBE_CONFIG }}" > ~/.kube/config
-        chmod 600 ~/.kube/config
+    - name: Compute Secret Hash
+      id: compute_hash
       shell: bash
+      run: |
+        HASH=$(sha256sum "${{ github.workspace }}/output/secret.yaml" | awk '{print $1}')
+        echo "hash=$HASH" >> $GITHUB_OUTPUT
+
+    - name: Check Previous Secret Hash
+      id: check_secret_change
+      shell: bash
+      run: |
+        # Check if secret exists
+        if kubectl get secret ${{ inputs.app_name }}-secret -n ${{ inputs.namespace }} &>/dev/null; then
+          # Secret exists, get its hash annotation
+          CURRENT_HASH=$(kubectl get secret ${{ inputs.app_name }}-secret -n ${{ inputs.namespace }} -o jsonpath='{.metadata.annotations.secret-hash}' 2>/dev/null || echo "")
+          if [ -z "$CURRENT_HASH" ]; then
+            # Secret exists but no hash annotation - treat as changed
+            echo "Secret exists but has no hash annotation - marking as changed"
+            echo "changed=true" >> $GITHUB_OUTPUT
+          else
+            # Compare hashes
+            NEW_HASH="${{ steps.compute_hash.outputs.hash }}"
+            if [ "$CURRENT_HASH" != "$NEW_HASH" ]; then
+              echo "Secret hash changed from $CURRENT_HASH to $NEW_HASH"
+              echo "changed=true" >> $GITHUB_OUTPUT
+            else
+              echo "Secret hash unchanged"
+              echo "changed=false" >> $GITHUB_OUTPUT
+            fi
+          fi
+        else
+          # Secret doesn't exist - treat as changed
+          echo "Secret doesn't exist - marking as changed"
+          echo "changed=true" >> $GITHUB_OUTPUT
+        fi
+
+    - name: Add Hash Annotation to Secret
+      shell: bash
+      run: |
+        # Add hash annotation to the secret yaml
+        sed -i "/metadata:/a\\  annotations:\\n    secret-hash: ${{ steps.compute_hash.outputs.hash }}" ${{ github.workspace }}/output/secret.yaml
 
     - name: Apply Kubernetes Secret
       run: kubectl apply -f ${{ github.workspace }}/output/secret.yaml            
       shell: bash
-
-    - name: Compute Secret Checksum
-      id: secret_checksum
-      shell: bash
-      run: |
-        CHECKSUM=$(sha256sum "${{ github.workspace }}/output/secret.yaml" | awk '{print $1}')
-        echo "checksum=$CHECKSUM" >> $GITHUB_OUTPUT      
-
-    - name: Patch Deployment to Restart
-      shell: bash
-      run: |
-        kubectl patch deployment ${{ inputs.app_name }} \
-          -n ${{ inputs.namespace }} \
-          -p "{\"spec\":{\"template\":{\"metadata\":{\"annotations\":{\"secret-checksum\":\"${{ steps.secret_checksum.outputs.checksum }}\"}}}}}"

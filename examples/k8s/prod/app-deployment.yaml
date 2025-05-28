@@ -12,17 +12,19 @@ spec:
       labels:
         app: example
     spec:
+      imagePullSecrets:
+        - name: dockerhub-secret    
       containers:
         - name: example
           ### placeholder to be set by cicd pipeline
           image: <IMAGE>
           env:
             - name: ETCD_URL
-              value: 'https://config.api.herodotus.cloud:2379'
+              value: 'https://etcd.etcd.svc.cluster.local:2379'
             - name: ETCD_USERNAME
               value: 'example-user'
             - name: ETCD_KEYS
-              value: '/example/config.stage.json'
+              value: 'example/config.stage.json'
           envFrom:
             - secretRef:
                 name: example-secret
@@ -58,3 +60,17 @@ spec:
   ports:
     - port: 8040
       targetPort: 8040
+### IF YOU NEED PERSISTENCE UNCOMMENT
+#---
+#apiVersion: v1
+#kind: PersistentVolumeClaim
+#metadata:
+#  name: example-pvc
+#spec:
+#  accessModes:
+#  - ReadWriteOnce
+#  resources:
+#    requests:
+#      storage: 1Gi
+#  storageClassName: lh-common
+

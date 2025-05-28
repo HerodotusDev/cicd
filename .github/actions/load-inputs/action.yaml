@@ -1,6 +1,5 @@
-name: "Load YAML Inputs as Environment Variables"
-description: "Parses a YAML file and sets all key-value pairs as environment variables."
-
+name: "Load Inputs as Environment Variables"
+description: "Reads a YAML file and sets all key-value pairs as environment variables directly."
 
 inputs:
   inputs_file:
@@ -9,37 +8,53 @@ inputs:
     default: "workflow-inputs.yaml"
 
 outputs:
-  env_vars:
-    description: "Serialized key-value pairs from the YAML file"
-    value: ${{ steps.export-envs.outputs.env_vars }}
+  app_names:
+    description: "The app_names value from the inputs file"
+    value: ${{ steps.load-inputs.outputs.app_names }}
 
 runs:
   using: "composite"
   steps:
-    - name: Install yq (YAML parser)
-      run: |
-        sudo apt update && sudo apt install -y jq wget
-        wget https://github.com/mikefarah/yq/releases/latest/download/yq_linux_amd64 -O /usr/local/bin/yq
-        chmod +x /usr/local/bin/yq
-      shell: bash
-
-    - name: Load Inputs Dynamically from YAML
-      id: export-envs
+    - name: Load Inputs and Set Environment Variables
+      id: load-inputs
       run: |
         if [ ! -f "${{ inputs.inputs_file }}" ]; then
           echo "❌ Error: File ${{ inputs.inputs_file }} not found!"
           exit 1
         fi
 
-        echo "✅ Parsing YAML and exporting variables..."
+        echo "✅ Reading input variables..."
         
-        # Convert YAML to JSON and store in output
-        JSON_OUTPUT=$(yq -o=json '.' "${{ inputs.inputs_file }}" | jq -c)
+        # Read the file line by line and set environment variables
+        while IFS= read -r line || [ -n "$line" ]; do  # Added -n "$line" to catch the last line
+          # Skip empty lines and full-line comments
+          if [[ -z "$line" || "$line" =~ ^[[:space:]]*# ]]; then
+            continue
+          fi
+          
+          # Remove inline comments and trim
+          original_line="$line"
+          line="${line%%#*}"
+          line="$(echo "$line" | sed -e 's/^[[:space:]]*//' -e 's/[[:space:]]*$//')"
+          
+          # Extract key and value using improved pattern matching
+          if [[ "$line" =~ ^([^:]+)[[:space:]]*:[[:space:]]*(.+)$ ]]; then
+            key="$(echo "${BASH_REMATCH[1]}" | sed -e 's/^[[:space:]]*//' -e 's/[[:space:]]*$//')"
+            value="$(echo "${BASH_REMATCH[2]}" | sed -e 's/^[[:space:]]*//' -e 's/[[:space:]]*$//')"
+            
+            # Remove quotes if present
+            value="${value%\"}"
+            value="${value#\"}"
+            
+            # Set the environment variable
+            echo "$key=$value" >> "$GITHUB_ENV"
+            echo "Set $key=$value"
 
-        # Store JSON output for use in following jobs
-        echo "env_vars=$JSON_OUTPUT" >> "$GITHUB_OUTPUT"
-
-        echo "✅ Loaded input variables:"
-        echo "$JSON_OUTPUT"
+          else
+            echo "⚠️ Warning: Could not parse line: '$original_line'"
+          fi
+        done < "${{ inputs.inputs_file }}"
+        
+        echo "✅ All variables loaded successfully"
       shell: bash
 

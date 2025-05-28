@@ -37,7 +37,10 @@ runs:
         # Install required tool if missing
         if [ "$TOOL" = "toml" ]; then
           if ! command -v toml &> /dev/null; then
+            sudo apt-get update && sudo apt-get install -y python3-pip
             pip install toml-cli
+            # Add local bin to PATH
+            export PATH="$HOME/.local/bin:$PATH"
           fi
         elif [ "$TOOL" = "jq" ]; then
           if ! command -v jq &> /dev/null; then

@@ -2,8 +2,11 @@
 name: "Deploy on K8s"
 description: "Deploys Kubernetes resources using kubectl."
 inputs:
-  kube_config:
-    description: "Contents of the kubeconfig file."
+  service_account_token:
+    description: "Service account token for Kubernetes authentication."
+    required: true
+  cluster_url:
+    description: "Kubernetes API server URL."
     required: true
   namespace:
     description: "Kubernetes namespace to deploy to."
@@ -28,6 +31,11 @@ inputs:
   app_name:
     description: "The application name to form the image name."
     required: true    
+  secret_changed:
+    description: "Whether the secret has changed and deployment needs restart"
+    required: false
+    default: "false"
+
 runs:
   using: "composite"
   steps:
@@ -38,12 +46,6 @@ runs:
       uses: azure/setup-kubectl@v4
       with:
         version: "v1.32.0"
-
-    - name: Configure kubectl
-      run: |
-        mkdir -p ~/.kube
-        echo "${{ inputs.kube_config }}" > ~/.kube/config
-      shell: bash
 
     - name: Update deployment YAML with image tag
       run: |
@@ -70,9 +72,20 @@ runs:
         fi
       shell: bash
 
-
-    - name: Wait for deployment rollout
+    - name: Wait for deployment apply to complete
       run: |
         kubectl rollout status deployment/"${{ inputs.app_name }}" --namespace "${{ inputs.namespace }}" --timeout=${{ inputs.rollout_timeout }}s
+      shell: bash
 
+    - name: Restart Deployment if Secret Changed
+      if: inputs.secret_changed == 'true'
+      run: |
+        echo "Secret changed - restarting deployment..."
+        kubectl rollout restart deployment/${{ inputs.app_name }} -n ${{ inputs.namespace }}
+      shell: bash
+
+    - name: Wait for restart to complete
+      if: inputs.secret_changed == 'true'
+      run: |
+        kubectl rollout status deployment/"${{ inputs.app_name }}" --namespace "${{ inputs.namespace }}" --timeout=${{ inputs.rollout_timeout }}s
       shell: bash
