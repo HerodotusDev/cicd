@@ -178,11 +178,10 @@ jobs:
         with:
           namespace: ${{ env.namespace }}
           etcd_root: ${{ env.etcd_root }}
-          app_name: ${{ env.app_name }}
           deployment_file: ./k8s/${{ inputs.k8s_env }}/${{ matrix.app }}-deployment.yaml
           ingress_file: ./k8s/${{ inputs.k8s_env }}/${{ matrix.app }}-ingress.yaml
           rollout_timeout: ${{ env.rollout_timeout }}
           image_tag: ${{ needs.version.outputs.version }}
           dockerhub_project: ${{ env.dockerhub_project }}
           app_name: ${{ matrix.app }}
-          secret_changed: ${{ steps.pull_config.outputs.secret_changed }} 
+          secret_changed: ${{ steps.pull_config.outputs.secret_changed }}
