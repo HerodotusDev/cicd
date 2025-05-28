@@ -15,6 +15,9 @@ inputs:
   etcd_key:
     description: 'ETCD key to fetch'
     required: true
+  etcd_root:
+    description: 'ETCD key to fetch'
+    required: true    
   namespace:
     description: 'Kubernetes namespace for the Secret'
     required: false
@@ -43,7 +46,7 @@ runs:
           -e ETCD_HOST="etcd.etcd.svc.cluster.local:2379" \
           -e ETCD_USER="${{ inputs.ETCD_USER }}" \
           -e ETCD_PASSWORD="${{ inputs.ETCD_PASSWORD }}" \
-          -e ETCD_KEY="/${{ inputs.namespace }}/${{ inputs.app_name }}/envs/${{ inputs.ETCD_KEY }}" \
+          -e ETCD_KEY="/${{ inputs.etcd_root }}/${{ inputs.app_name }}/envs/${{ inputs.ETCD_KEY }}" \
           -e APP_NAME="${{ inputs.app_name }}" \
           -e NAMESPACE="${{ inputs.namespace }}" \
           -v ${{ github.workspace }}/output:/output \

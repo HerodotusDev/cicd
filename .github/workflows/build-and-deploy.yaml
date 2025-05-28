@@ -177,6 +177,8 @@ jobs:
         uses: HerodotusDev/cicd/.github/actions/deploy-to-k8s@main
         with:
           namespace: ${{ env.namespace }}
+          etcd_root: ${{ env.etcd_root }}
+          app_name: ${{ env.app_name }}
           deployment_file: ./k8s/${{ inputs.k8s_env }}/${{ matrix.app }}-deployment.yaml
           ingress_file: ./k8s/${{ inputs.k8s_env }}/${{ matrix.app }}-ingress.yaml
           rollout_timeout: ${{ env.rollout_timeout }}
