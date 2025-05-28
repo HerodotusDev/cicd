@@ -103,6 +103,9 @@ jobs:
 
       - name: Build and push image
         uses: HerodotusDev/cicd/.github/actions/build-and-push-image@arc
+        env:
+          overwrite_dockerfile: storage-proofs
+          dockerfile: ${{ env.github.repository == 'HerodotusDev/backend' && 'overwrite_dockerfile' || matrix.app }}          
         with:
           dockerhub_project: ${{ env.dockerhub_project }}
           app_name: ${{ matrix.app }}
@@ -110,6 +113,7 @@ jobs:
           docker_username: ${{ env.ARC_DOCKER_USERNAME }}
           docker_password: ${{ env.ARC_DOCKER_PASSWORD }}
           dockerfile: ./docker/Dockerfile.${{ matrix.app }}
+        if: ${{ github.repository }} != "HerodotusDev/backend"      
 
   create-git-tag:
     needs: [version, build-and-push-image]
@@ -156,17 +160,18 @@ jobs:
         uses: HerodotusDev/cicd/.github/actions/load-inputs@arc
         with:
           inputs_file: ./k8s/${{ inputs.k8s_env }}/cicd-inputs.yaml
-
-      - name: Pull config from etcd
+      - name: Pull  config from etcd
         id: pull_config
-        uses: HerodotusDev/cicd/.github/actions/pull-etcd-config@arc
-        if: ${{ env.pull_etcd_config == 'true' }}
+        uses: HerodotusDev/cicd/.github/actions/pull-etcd-config@storageproofs
+        env:
+          overwrite_app_name: storage-proofs
+          app_name: ${{ env.github.repository == 'HerodotusDev/backend' && 'overwrite_app_name' || matrix.app }}          
         with:
           namespace: ${{ env.namespace }}
-          app_name: ${{ matrix.app }}
+          app_name: ${{ env.app_name }}
           etcd_user: ${{ env.ARC_ETCD_USER }}
           etcd_password: ${{ env.ARC_ETCD_PASSWORD }}
-          etcd_key: ${{ env.etcd_key }}
+          etcd_key: ${{ env.etcd_key }}          
 
       - name: Deploy to Kubernetes
         uses: HerodotusDev/cicd/.github/actions/deploy-to-k8s@arc
