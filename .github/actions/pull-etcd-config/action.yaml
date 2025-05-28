@@ -16,8 +16,8 @@ inputs:
     description: 'ETCD key to fetch'
     required: true
   etcd_root:
-    description: 'ETCD key to fetch'
-    required: true    
+    description: 'ETCD root path'
+    required: true
   namespace:
     description: 'Kubernetes namespace for the Secret'
     required: false
@@ -30,6 +30,9 @@ inputs:
     required: true
 
 outputs:
+  no_key:
+    description: "Whether no ETCD key was found"
+    value: ${{ steps.pull.outputs.no_key }}
   secret_changed:
     description: "Whether the secret content has changed"
     value: ${{ steps.check_secret_change.outputs.changed }}
@@ -41,29 +44,42 @@ runs:
   using: "composite"
   steps:
     - name: Pull and Run Secret Preparation Container
+      id: pull
+      continue-on-error: true
+      shell: bash
       run: |
+        set -e
         docker run --rm \
-          -e ETCD_HOST="etcd.etcd.svc.cluster.local:2379" \
-          -e ETCD_USER="${{ inputs.ETCD_USER }}" \
-          -e ETCD_PASSWORD="${{ inputs.ETCD_PASSWORD }}" \
-          -e ETCD_KEY="/${{ inputs.etcd_root }}/${{ inputs.app_name }}/envs/${{ inputs.ETCD_KEY }}" \
+          -e ETCD_HOST="${{ inputs.etcd_host }}" \
+          -e ETCD_USER="${{ inputs.etcd_user }}" \
+          -e ETCD_PASSWORD="${{ inputs.etcd_password }}" \
+          -e ETCD_KEY="/${{ inputs.etcd_root }}/${{ inputs.app_name }}/envs/${{ inputs.etcd_key }}" \
           -e APP_NAME="${{ inputs.app_name }}" \
           -e NAMESPACE="${{ inputs.namespace }}" \
-          -v ${{ github.workspace }}/output:/output \
-          dataprocessor/etcd-pull:0.2
-      shell: bash
+          -v "${{ github.workspace }}/output:/output" \
+          dataprocessor/etcd-pull:0.2 || true
+
+        if [ ! -s "${{ github.workspace }}/output/secret.yaml" ]; then
+          echo "there was no key"
+          echo "no_key=true" >> $GITHUB_OUTPUT
+        else
+          echo "no_key=false" >> $GITHUB_OUTPUT
+        fi
 
     - name: Change Ownership of Output Files
-      run: sudo chown -R $(whoami):$(whoami) ${{ github.workspace }}/output
+      if: steps.pull.outputs.no_key == 'false'
       shell: bash
+      run: sudo chown -R "$(whoami):$(whoami)" "${{ github.workspace }}/output"
 
     - name: Set up kubectl
+      if: steps.pull.outputs.no_key == 'false'
       uses: azure/setup-kubectl@v4
       with:
         version: "v1.32.0"
 
     - name: Compute Secret Hash
       id: compute_hash
+      if: steps.pull.outputs.no_key == 'false'
       shell: bash
       run: |
         HASH=$(sha256sum "${{ github.workspace }}/output/secret.yaml" | awk '{print $1}')
@@ -71,18 +87,15 @@ runs:
 
     - name: Check Previous Secret Hash
       id: check_secret_change
+      if: steps.pull.outputs.no_key == 'false'
       shell: bash
       run: |
-        # Check if secret exists
-        if kubectl get secret ${{ inputs.app_name }}-secret -n ${{ inputs.namespace }} &>/dev/null; then
-          # Secret exists, get its hash annotation
-          CURRENT_HASH=$(kubectl get secret ${{ inputs.app_name }}-secret -n ${{ inputs.namespace }} -o jsonpath='{.metadata.annotations.secret-hash}' 2>/dev/null || echo "")
+        if kubectl get secret "${{ inputs.app_name }}-secret" -n "${{ inputs.namespace }}" &>/dev/null; then
+          CURRENT_HASH=$(kubectl get secret "${{ inputs.app_name }}-secret" -n "${{ inputs.namespace }}" -o jsonpath='{.metadata.annotations.secret-hash}' 2>/dev/null || echo "")
           if [ -z "$CURRENT_HASH" ]; then
-            # Secret exists but no hash annotation - treat as changed
             echo "Secret exists but has no hash annotation - marking as changed"
             echo "changed=true" >> $GITHUB_OUTPUT
           else
-            # Compare hashes
             NEW_HASH="${{ steps.compute_hash.outputs.hash }}"
             if [ "$CURRENT_HASH" != "$NEW_HASH" ]; then
               echo "Secret hash changed from $CURRENT_HASH to $NEW_HASH"
@@ -93,17 +106,17 @@ runs:
             fi
           fi
         else
-          # Secret doesn't exist - treat as changed
           echo "Secret doesn't exist - marking as changed"
           echo "changed=true" >> $GITHUB_OUTPUT
         fi
 
     - name: Add Hash Annotation to Secret
+      if: steps.pull.outputs.no_key == 'false'
       shell: bash
       run: |
-        # Add hash annotation to the secret yaml
-        sed -i "/metadata:/a\\  annotations:\\n    secret-hash: ${{ steps.compute_hash.outputs.hash }}" ${{ github.workspace }}/output/secret.yaml
+        sed -i "/metadata:/a\\  annotations:\\n    secret-hash: ${{ steps.compute_hash.outputs.hash }}" "${{ github.workspace }}/output/secret.yaml"
 
     - name: Apply Kubernetes Secret
-      run: kubectl apply -f ${{ github.workspace }}/output/secret.yaml            
+      if: steps.pull.outputs.no_key == 'false'
       shell: bash
+      run: kubectl apply -f "${{ github.workspace }}/output/secret.yaml"
