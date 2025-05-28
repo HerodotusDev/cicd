@@ -5,7 +5,7 @@ inputs:
   etcd_host:
     description: 'ETCD endpoint'
     required: false
-    default: https://etcd.etcd.svc.cluster.local:2379
+    default: http://etcd.etcd.svc.cluster.local:2379
   etcd_user:
     description: 'ETCD username'
     required: true
