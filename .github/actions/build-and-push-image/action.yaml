@@ -44,8 +44,16 @@ runs:
         password: ${{ inputs.docker_password }}      
 
     - name: Set image
-      run: echo "IMAGE=${{ inputs.dockerhub_project }}/${{ github.ref_name != 'main' && 'stg-' || '' }}${{ inputs.app_name }}" >> $GITHUB_ENV
       shell: bash
+      run: |
+        BRANCH=${GITHUB_REF#refs/heads/}    # strip off “refs/heads/”
+        PREFIX=""
+        if [[ "$BRANCH" != "main" ]]; then
+          PREFIX="stg-"
+        fi
+        echo "IMAGE=${{ inputs.dockerhub_project }}/${PREFIX}${{ inputs.app_name }}" >> $GITHUB_ENV
+
+
     - name: Check if Docker image exists
       id: check_image
       shell: bash
