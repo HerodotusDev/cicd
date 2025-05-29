@@ -102,7 +102,7 @@ jobs:
           inputs_file: ./k8s/${{ inputs.k8s_env }}/cicd-inputs.yaml
 
       - name: Build and push image
-        uses: HerodotusDev/cicd/.github/actions/build-and-push-image@main
+        uses: HerodotusDev/cicd/.github/actions/build-and-push-image@stg_image_separation
         env:
           overwrite_dockerfile: storage-proofs
           dockerfile: ${{ env.github.repository == 'HerodotusDev/backend' && 'overwrite_dockerfile' || matrix.app }}          
