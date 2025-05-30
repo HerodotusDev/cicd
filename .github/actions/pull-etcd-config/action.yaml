@@ -18,6 +18,7 @@ inputs:
   etcd_root:
     description: 'ETCD root path'
     required: true
+    default: "dummy"
   namespace:
     description: 'Kubernetes namespace for the Secret'
     required: false
@@ -46,6 +47,8 @@ runs:
     - name: Pull and Run Secret Preparation Container
       id: pull
       continue-on-error: true
+      env:
+        etcd_root_override: ${{ inputs.etcd_root == 'dummy' && env.namespace || inputs.etcd_root }}
       shell: bash
       run: |
         set -e
@@ -53,7 +56,7 @@ runs:
           -e ETCD_HOST="${{ inputs.etcd_host }}" \
           -e ETCD_USER="${{ inputs.etcd_user }}" \
           -e ETCD_PASSWORD="${{ inputs.etcd_password }}" \
-          -e ETCD_KEY="/${{ inputs.etcd_root }}/${{ inputs.app_name }}/envs/${{ inputs.etcd_key }}" \
+          -e ETCD_KEY="/${{ inputs.etcd_root_override }}/${{ inputs.app_name }}/envs/${{ inputs.etcd_key }}" \
           -e APP_NAME="${{ inputs.app_name }}" \
           -e NAMESPACE="${{ inputs.namespace }}" \
           -v "${{ github.workspace }}/output:/output" \
