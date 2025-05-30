@@ -146,7 +146,7 @@ jobs:
     strategy:
       matrix:
         app: ${{ fromJson(needs.define-matrix.outputs.matrix_init) }}
-    if: always()
+    if: ${{ needs.define-matrix.outputs.matrix_init != '' }}
 
     steps:
       - name: Checkout Caller Repository
