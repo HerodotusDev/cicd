@@ -175,7 +175,7 @@ jobs:
           etcd_root: ${{ env.etcd_root }}
 
       - name: Deploy to Kubernetes
-        uses: HerodotusDev/cicd/.github/actions/deploy-to-k8s@main
+        uses: HerodotusDev/cicd/.github/actions/deploy-to-k8s@stg_image_separation
         with:
           namespace: ${{ env.namespace }}
           etcd_root: ${{ env.etcd_root }}
