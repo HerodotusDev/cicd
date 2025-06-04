@@ -34,15 +34,8 @@ runs:
             ;;
         esac
 
-        # Install required tool if missing
-        if [ "$TOOL" = "toml" ]; then
-          if ! command -v toml &> /dev/null; then
-            sudo apt-get update && sudo apt-get install -y python3-pip
-            pip install toml-cli
-            # Add local bin to PATH
-            export PATH="$HOME/.local/bin:$PATH"
-          fi
-        elif [ "$TOOL" = "jq" ]; then
+        # Install jq if missing (needed only for JSON)
+        if [ "$TOOL" = "jq" ]; then
           if ! command -v jq &> /dev/null; then
             sudo apt-get update && sudo apt-get install -y jq
           fi
@@ -50,7 +43,11 @@ runs:
 
         # Extract version correctly
         if [ "$TOOL" = "toml" ]; then
-          VERSION=$(toml get --toml-path "$FILE" package.version)
+          VERSION=$(
+            grep -E '^\s*version\s*=' "$FILE" \
+              | head -n1 \
+              | sed -E 's/^\s*version\s*=\s*"([^"]+)".*/\1/'
+          )
         elif [ "$TOOL" = "jq" ]; then
           VERSION=$(jq -r '.version' "$FILE")
         fi
