@@ -18,7 +18,7 @@ inputs:
   etcd_root:
     description: 'ETCD root path'
     required: true
-    default: ""
+    default: "default"
   namespace:
     description: 'Kubernetes namespace for the Secret'
     required: false
@@ -48,7 +48,7 @@ runs:
       id: pull
       continue-on-error: true
       env:
-        etcd_root_override: ${{ inputs.etcd_root == '' && env.namespace || inputs.etcd_root }}
+        etcd_root_override: ${{ inputs.etcd_root == 'default' && env.namespace || inputs.etcd_root }}
       shell: bash
       run: |
         set -e
