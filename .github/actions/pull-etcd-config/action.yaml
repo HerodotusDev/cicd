@@ -22,7 +22,7 @@ inputs:
   namespace:
     description: 'Kubernetes namespace for the Secret'
     required: false
-    default: 'default'
+    default: ''
   app_name:
     description: 'Application name'
     required: true
@@ -48,7 +48,7 @@ runs:
       id: pull
       continue-on-error: true
       env:
-        etcd_root_override: ${{ inputs.etcd_root == 'default' && env.namespace || inputs.etcd_root }}
+        etcd_root_override: ${{ inputs.etcd_root == '' && env.namespace || inputs.etcd_root }}
       shell: bash
       run: |
         set -e
@@ -56,7 +56,7 @@ runs:
           -e ETCD_HOST="${{ inputs.etcd_host }}" \
           -e ETCD_USER="${{ inputs.etcd_user }}" \
           -e ETCD_PASSWORD="${{ inputs.etcd_password }}" \
-          -e ETCD_KEY="/${{ inputs.etcd_root_override }}/${{ inputs.app_name }}/envs/${{ inputs.etcd_key }}" \
+          -e ETCD_KEY="/${{ env.etcd_root_override }}/${{ inputs.app_name }}/envs/${{ inputs.etcd_key }}" \
           -e APP_NAME="${{ inputs.app_name }}" \
           -e NAMESPACE="${{ inputs.namespace }}" \
           -v "${{ github.workspace }}/output:/output" \
