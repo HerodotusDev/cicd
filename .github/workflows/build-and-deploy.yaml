@@ -78,7 +78,7 @@ jobs:
           inputs_file: ./k8s/${{ inputs.k8s_env }}/cicd-inputs.yaml
 
       - name: Extract Version
-        uses: HerodotusDev/cicd/.github/actions/extract-version@builder_image
+        uses: HerodotusDev/cicd/.github/actions/extract-version@feat/builder_image
         id: version
         with:
           file: ${{ env.version_file }}
