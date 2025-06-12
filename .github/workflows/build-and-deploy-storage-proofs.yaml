@@ -227,7 +227,7 @@ jobs:
 
       - name: Pull config from etcd
         id: pull_config
-        uses: HerodotusDev/cicd/.github/actions/pull-etcd-config@storageproofs
+        uses: HerodotusDev/cicd/.github/actions/pull-etcd-config@main
         if: ${{ env.pull_etcd_config == 'true' }}
         with:
           namespace: ${{ env.namespace }}
