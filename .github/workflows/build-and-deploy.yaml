@@ -15,7 +15,7 @@ jobs:
   guard:
     runs-on: ubuntu-latest
     steps:
-      - uses: ./.github/actions/guard-branch
+      - uses: HerodotusDev/cicd/.github/actions/guard-branch@env_standards
   define-matrix:
     runs-on: hero-arc-runners
     outputs:
