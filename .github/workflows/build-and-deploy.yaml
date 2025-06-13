@@ -30,7 +30,7 @@ jobs:
 
       - name: Load App Names
         id: load-app-names
-        uses: HerodotusDev/cicd/.github/actions/load-inputs@main
+        uses: HerodotusDev/cicd/.github/actions/load-inputs@feat/env_standards
         with:
           inputs_file: ./k8s/${{ inputs.k8s_env }}/cicd-inputs.yaml
 
@@ -71,12 +71,12 @@ jobs:
 
       - name: Load Inputs from YAML
         id: load-inputs
-        uses: HerodotusDev/cicd/.github/actions/load-inputs@main
+        uses: HerodotusDev/cicd/.github/actions/load-inputs@feat/env_standards
         with:
           inputs_file: ./k8s/${{ inputs.k8s_env }}/cicd-inputs.yaml
 
       - name: Extract Version
-        uses: HerodotusDev/cicd/.github/actions/extract-version@main
+        uses: HerodotusDev/cicd/.github/actions/extract-version@feat/env_standards
         id: version
         with:
           file: ${{ env.version_file }}
@@ -97,15 +97,15 @@ jobs:
 
       - name: Load Inputs from YAML
         id: load-inputs
-        uses: HerodotusDev/cicd/.github/actions/load-inputs@main
+        uses: HerodotusDev/cicd/.github/actions/load-inputs@feat/env_standards
         with:
           inputs_file: ./k8s/${{ inputs.k8s_env }}/cicd-inputs.yaml
 
       - name: Build and push image
-        uses: HerodotusDev/cicd/.github/actions/build-and-push-image@stg_image_separation
+        uses: HerodotusDev/cicd/.github/actions/build-and-push-image@feat/env_standards
         env:
           overwrite_dockerfile: storage-proofs
-          dockerfile: ${{ env.github.repository == 'HerodotusDev/backend' && 'overwrite_dockerfile' || matrix.app }}          
+          dockerfile: ${{ env.REPO_NAME == 'backend' && 'overwrite_dockerfile' || matrix.app }}          
         with:
           dockerhub_project: ${{ env.dockerhub_project }}
           app_name: ${{ matrix.app }}
@@ -128,12 +128,12 @@ jobs:
 
       - name: Load Inputs from YAML
         id: load-inputs
-        uses: HerodotusDev/cicd/.github/actions/load-inputs@main
+        uses: HerodotusDev/cicd/.github/actions/load-inputs@feat/env_standards
         with:
           inputs_file: ./k8s/${{ inputs.k8s_env }}/cicd-inputs.yaml
 
       - name: Create Git tag
-        uses: HerodotusDev/cicd/.github/actions/create-git-tag@main
+        uses: HerodotusDev/cicd/.github/actions/create-git-tag@feat/env_standards
         with:
           tag: ${{ needs.version.outputs.version }}
           token: ${{ secrets.GITHUB_TOKEN }}
@@ -157,15 +157,15 @@ jobs:
 
       - name: Load Inputs from YAML
         id: load-inputs
-        uses: HerodotusDev/cicd/.github/actions/load-inputs@main
+        uses: HerodotusDev/cicd/.github/actions/load-inputs@feat/env_standards
         with:
           inputs_file: ./k8s/${{ inputs.k8s_env }}/cicd-inputs.yaml
       - name: Pull  config from etcd
         id: pull_config
-        uses: HerodotusDev/cicd/.github/actions/pull-etcd-config@stg_image_separation
+        uses: HerodotusDev/cicd/.github/actions/pull-etcd-config@feat/env_standards
         env:
           overwrite_app_name: storage-proofs
-          app_name: ${{ env.github.repository == 'HerodotusDev/backend' && 'overwrite_app_name' || matrix.app }}          
+          app_name: ${{ env.REPO_NAME == 'backend' && 'overwrite_app_name' || matrix.app }}        
         with:
           namespace: ${{ env.namespace }}
           app_name: ${{ env.app_name }}
@@ -175,12 +175,12 @@ jobs:
           etcd_root: ${{ env.etcd_root }}
 
       - name: Deploy to Kubernetes
-        uses: HerodotusDev/cicd/.github/actions/deploy-to-k8s@stg_image_separation
+        uses: HerodotusDev/cicd/.github/actions/deploy-to-k8s@feat/env_standards
         with:
           namespace: ${{ env.namespace }}
-          etcd_root: ${{ env.etcd_root }}
-          deployment_file: ./k8s/${{ inputs.k8s_env }}/${{ matrix.app }}-deployment.yaml
-          ingress_file: ./k8s/${{ inputs.k8s_env }}/${{ matrix.app }}-ingress.yaml
+          repo_name: ${{ env.repo_name }}
+          deployment_file: ./k8s/${{ env.k8s_env }}/${{ matrix.app }}-deployment.yaml
+          ingress_file: ./k8s/${{ env.k8s_env }}/${{ matrix.app }}-ingress.yaml
           rollout_timeout: ${{ env.rollout_timeout }}
           image_tag: ${{ needs.version.outputs.version }}
           dockerhub_project: ${{ env.dockerhub_project }}

@@ -48,8 +48,12 @@ runs:
       run: |
         BRANCH=${GITHUB_REF#refs/heads/}    # strip off “refs/heads/”
         PREFIX=""
-        if [[ "$BRANCH" != "main" ]]; then
+        if [[ "$BRANCH" == "develop" ]]; then
           PREFIX="stg-"
+        elif [[ "$BRANCH" == "" ]]; then
+          PREFIX=""
+        else
+          PREFIX="dev-"
         fi
         echo "IMAGE=${{ inputs.dockerhub_project }}/${PREFIX}${{ inputs.app_name }}" >> $GITHUB_ENV
 
