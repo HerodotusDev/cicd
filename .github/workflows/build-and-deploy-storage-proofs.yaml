@@ -76,7 +76,8 @@ jobs:
           token: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Load Inputs from YAML
-        id: load-inputs        uses: HerodotusDev/cicd/.github/actions/load-inputs@main
+        id: load-inputs        
+        uses: HerodotusDev/cicd/.github/actions/load-inputs@main
         with:
           inputs_file: ./k8s/${{ inputs.k8s_env }}/cicd-inputs.yaml
 
