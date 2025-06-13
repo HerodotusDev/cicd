@@ -1,0 +1,4 @@
+namespace: example                                # namespace to be deploy  
+app_names: ["example","example2"]                 # list of app names to deploy, can be single or multiple
+init_pods: ["init-example"]
+dockerhub_project: dataprocessor                  # name of the dockerhub project the image will be pushed to / pulled from

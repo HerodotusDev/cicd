@@ -2,20 +2,20 @@ name: Build & deploy
 
 on:
   workflow_call:
-    inputs:    
-      k8s_env:
-        type: string
-        required: false  
-        default: stage
 
 env:
   rollout_timeout: 300       
   version_file: ./package.json  
+  inputs_files: ./k8s/cicd-inputs.yaml
   
 permissions:
   contents: write
 
 jobs:
+  guard:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: ./.github/actions/guard-branch
   define-matrix:
     runs-on: hero-arc-runners
     outputs:
@@ -32,7 +32,7 @@ jobs:
         id: load-app-names
         uses: HerodotusDev/cicd/.github/actions/load-inputs@feat/env_standards
         with:
-          inputs_file: ./k8s/${{ inputs.k8s_env }}/cicd-inputs.yaml
+          inputs_file: ${{env.inputs_files}}
 
       - name: Define apps matrix
         id: define-matrix
@@ -40,6 +40,7 @@ jobs:
           echo 'matrix_apps=${{ env.app_names }}' >> "$GITHUB_OUTPUT"
 
   siren:
+    needs: [guard]
     runs-on: hero-arc-runners
     if: false
     steps:
@@ -61,6 +62,7 @@ jobs:
     outputs:
       version: ${{ steps.version.outputs.version }}
     runs-on: hero-arc-runners
+    needs: [guard]
     steps:
       - name: Checkout Caller Repository
         uses: actions/checkout@v4
@@ -73,7 +75,7 @@ jobs:
         id: load-inputs
         uses: HerodotusDev/cicd/.github/actions/load-inputs@feat/env_standards
         with:
-          inputs_file: ./k8s/${{ inputs.k8s_env }}/cicd-inputs.yaml
+          inputs_file: ${{env.inputs_files}}
 
       - name: Extract Version
         uses: HerodotusDev/cicd/.github/actions/extract-version@feat/env_standards
@@ -82,7 +84,7 @@ jobs:
           file: ${{ env.version_file }}
 
   build-and-push-image:
-    needs: [define-matrix, version]
+    needs: [define-matrix, version, guard]
     runs-on: hero-arc-runners
     strategy:
       matrix:
@@ -99,7 +101,7 @@ jobs:
         id: load-inputs
         uses: HerodotusDev/cicd/.github/actions/load-inputs@feat/env_standards
         with:
-          inputs_file: ./k8s/${{ inputs.k8s_env }}/cicd-inputs.yaml
+          inputs_file: ${{env.inputs_files}}
 
       - name: Build and push image
         uses: HerodotusDev/cicd/.github/actions/build-and-push-image@feat/env_standards
@@ -113,10 +115,9 @@ jobs:
           docker_username: ${{ env.ARC_DOCKER_USERNAME }}
           docker_password: ${{ env.ARC_DOCKER_PASSWORD }}
           dockerfile: ./docker/Dockerfile.${{ matrix.app }}
-        if: ${{ github.repository }} != "HerodotusDev/backend"      
 
   create-git-tag:
-    needs: [version, build-and-push-image]
+    needs: [version, build-and-push-image, guard]
     runs-on: hero-arc-runners 
     steps:
       - name: Checkout Caller Repository
@@ -130,7 +131,7 @@ jobs:
         id: load-inputs
         uses: HerodotusDev/cicd/.github/actions/load-inputs@feat/env_standards
         with:
-          inputs_file: ./k8s/${{ inputs.k8s_env }}/cicd-inputs.yaml
+          inputs_file: ${{env.inputs_files}}
 
       - name: Create Git tag
         uses: HerodotusDev/cicd/.github/actions/create-git-tag@feat/env_standards
@@ -138,8 +139,8 @@ jobs:
           tag: ${{ needs.version.outputs.version }}
           token: ${{ secrets.GITHUB_TOKEN }}
 
-  deploy-staging:
-    needs: [define-matrix, version, create-git-tag, build-and-push-image]
+  deploy:
+    needs: [define-matrix, version, create-git-tag, build-and-push-image, guard]
     runs-on: hero-arc-runners
     strategy:
       matrix:
@@ -159,7 +160,7 @@ jobs:
         id: load-inputs
         uses: HerodotusDev/cicd/.github/actions/load-inputs@feat/env_standards
         with:
-          inputs_file: ./k8s/${{ inputs.k8s_env }}/cicd-inputs.yaml
+          inputs_file: ${{env.inputs_files}}
       - name: Pull  config from etcd
         id: pull_config
         uses: HerodotusDev/cicd/.github/actions/pull-etcd-config@feat/env_standards
@@ -170,15 +171,13 @@ jobs:
           namespace: ${{ env.namespace }}
           app_name: ${{ env.app_name }}
           etcd_user: ${{ env.ARC_ETCD_USER }}
-          etcd_password: ${{ env.ARC_ETCD_PASSWORD }}
-          etcd_key: ${{ env.etcd_key }}          
-          etcd_root: ${{ env.etcd_root }}
+          etcd_password: ${{ env.ARC_ETCD_PASSWORD }}          
+          etcd_root: ${{ env.repo_name }}
 
       - name: Deploy to Kubernetes
         uses: HerodotusDev/cicd/.github/actions/deploy-to-k8s@feat/env_standards
         with:
           namespace: ${{ env.namespace }}
-          repo_name: ${{ env.repo_name }}
           deployment_file: ./k8s/${{ env.k8s_env }}/${{ matrix.app }}-deployment.yaml
           ingress_file: ./k8s/${{ env.k8s_env }}/${{ matrix.app }}-ingress.yaml
           rollout_timeout: ${{ env.rollout_timeout }}

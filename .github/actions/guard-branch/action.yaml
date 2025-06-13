@@ -1,0 +1,17 @@
+name: "Guard Branch"
+description: "Fails if the current branch is not 'main' or 'develop'"
+
+runs:
+  using: "composite"
+  steps:
+    - shell: bash
+      run: |
+        BRANCH="${GITHUB_REF_NAME}"
+        echo "🔍 Checking if branch '$BRANCH' is allowed..."
+
+        if [[ "$BRANCH" == "main" || "$BRANCH" == "develop" ]]; then
+          echo "✅ Branch '$BRANCH' is allowed."
+        else
+          echo "❌ Branch '$BRANCH' is not allowed."
+          exit 1
+        fi
