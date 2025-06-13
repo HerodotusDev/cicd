@@ -31,7 +31,7 @@ jobs:
 
       - name: Load App Names
         id: load-app-names
-        uses: HerodotusDev/cicd/.github/actions/load-inputs@arc
+        uses: HerodotusDev/cicd/.github/actions/load-inputs@main
         with:
           inputs_file: ./k8s/${{ inputs.k8s_env }}/cicd-inputs.yaml
 
@@ -76,13 +76,12 @@ jobs:
           token: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Load Inputs from YAML
-        id: load-inputs
-        uses: HerodotusDev/cicd/.github/actions/load-inputs@arc
+        id: load-inputs        uses: HerodotusDev/cicd/.github/actions/load-inputs@main
         with:
           inputs_file: ./k8s/${{ inputs.k8s_env }}/cicd-inputs.yaml
 
       - name: Extract Version
-        uses: HerodotusDev/cicd/.github/actions/extract-version@arc
+        uses: HerodotusDev/cicd/.github/actions/extract-version@main
         id: version
         with:
           file: ${{ env.version_file }}
@@ -103,12 +102,12 @@ jobs:
 
       - name: Load Inputs from YAML
         id: load-inputs
-        uses: HerodotusDev/cicd/.github/actions/load-inputs@arc
+        uses: HerodotusDev/cicd/.github/actions/load-inputs@main
         with:
           inputs_file: ./k8s/${{ inputs.k8s_env }}/cicd-inputs.yaml
 
       - name: Build and push image
-        uses: HerodotusDev/cicd/.github/actions/build-and-push-image@arc
+        uses: HerodotusDev/cicd/.github/actions/build-and-push-image@main
         with:
           dockerhub_project: ${{ env.dockerhub_project }}
           app_name: ${{ matrix.app }}
@@ -130,12 +129,12 @@ jobs:
 
       - name: Load Inputs from YAML
         id: load-inputs
-        uses: HerodotusDev/cicd/.github/actions/load-inputs@arc
+        uses: HerodotusDev/cicd/.github/actions/load-inputs@main
         with:
           inputs_file: ./k8s/${{ inputs.k8s_env }}/cicd-inputs.yaml
 
       - name: Create Git tag
-        uses: HerodotusDev/cicd/.github/actions/create-git-tag@arc
+        uses: HerodotusDev/cicd/.github/actions/create-git-tag@main
         with:
           tag: ${{ needs.version.outputs.version }}
           token: ${{ secrets.GITHUB_TOKEN }}
@@ -158,7 +157,7 @@ jobs:
                   
       - name: Load Inputs from YAML
         id: load-inputs
-        uses: HerodotusDev/cicd/.github/actions/load-inputs@arc
+        uses: HerodotusDev/cicd/.github/actions/load-inputs@main
         with:
           inputs_file: ./k8s/${{ inputs.k8s_env }}/cicd-inputs.yaml          
 
@@ -221,13 +220,13 @@ jobs:
 
       - name: Load Inputs from YAML
         id: load-inputs
-        uses: HerodotusDev/cicd/.github/actions/load-inputs@arc
+        uses: HerodotusDev/cicd/.github/actions/load-inputs@main
         with:
           inputs_file: ./k8s/${{ inputs.k8s_env }}/cicd-inputs.yaml
 
       - name: Pull config from etcd
         id: pull_config
-        uses: HerodotusDev/cicd/.github/actions/pull-etcd-config@storageproofs
+        uses: HerodotusDev/cicd/.github/actions/pull-etcd-config@main
         if: ${{ env.pull_etcd_config == 'true' }}
         with:
           namespace: ${{ env.namespace }}
@@ -237,7 +236,7 @@ jobs:
           etcd_key: ${{ env.etcd_key }}       
 
       - name: Deploy to Kubernetes
-        uses: HerodotusDev/cicd/.github/actions/deploy-to-k8s@arc
+        uses: HerodotusDev/cicd/.github/actions/deploy-to-k8s@main
         with:
           namespace: ${{ env.namespace }}
           deployment_file: ./k8s/${{ inputs.k8s_env }}/${{ matrix.app }}-deployment.yaml

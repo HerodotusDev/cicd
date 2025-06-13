@@ -18,7 +18,7 @@ inputs:
   etcd_root:
     description: 'ETCD root path'
     required: true
-    default: "default"
+    default: ""
   namespace:
     description: 'Kubernetes namespace for the Secret'
     required: false
