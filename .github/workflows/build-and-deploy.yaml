@@ -102,7 +102,7 @@ jobs:
           inputs_file: ./k8s/${{ inputs.k8s_env }}/cicd-inputs.yaml
 
       - name: Build and push image
-        uses: HerodotusDev/cicd/.github/actions/build-and-push-image@main
+        uses: HerodotusDev/cicd/.github/actions/build-and-push-image@stg_image_separation
         env:
           overwrite_dockerfile: storage-proofs
           dockerfile: ${{ env.github.repository == 'HerodotusDev/backend' && 'overwrite_dockerfile' || matrix.app }}          
@@ -162,7 +162,7 @@ jobs:
           inputs_file: ./k8s/${{ inputs.k8s_env }}/cicd-inputs.yaml
       - name: Pull  config from etcd
         id: pull_config
-        uses: HerodotusDev/cicd/.github/actions/pull-etcd-config@main
+        uses: HerodotusDev/cicd/.github/actions/pull-etcd-config@stg_image_separation
         env:
           overwrite_app_name: storage-proofs
           app_name: ${{ env.github.repository == 'HerodotusDev/backend' && 'overwrite_app_name' || matrix.app }}          
@@ -175,7 +175,7 @@ jobs:
           etcd_root: ${{ env.etcd_root }}
 
       - name: Deploy to Kubernetes
-        uses: HerodotusDev/cicd/.github/actions/deploy-to-k8s@main
+        uses: HerodotusDev/cicd/.github/actions/deploy-to-k8s@stg_image_separation
         with:
           namespace: ${{ env.namespace }}
           etcd_root: ${{ env.etcd_root }}
