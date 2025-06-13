@@ -15,9 +15,10 @@ jobs:
   guard:
     runs-on: ubuntu-latest
     steps:
-      - uses: HerodotusDev/cicd/.github/actions/guard-branch@env_standards
+      - uses: HerodotusDev/cicd/.github/actions/guard-branch@feat/env_standards
   define-matrix:
     runs-on: hero-arc-runners
+    needs: [guard]
     outputs:
       matrix_apps: ${{ steps.define-matrix.outputs.matrix_apps }}
     steps:
