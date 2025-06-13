@@ -50,7 +50,7 @@ runs:
         PREFIX=""
         if [[ "$BRANCH" == "develop" ]]; then
           PREFIX="stg-"
-        elif [[ "$BRANCH" == "" ]]; then
+        elif [[ "$BRANCH" == "main" ]]; then
           PREFIX=""
         else
           PREFIX="dev-"
