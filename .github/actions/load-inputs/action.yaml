@@ -61,15 +61,15 @@ runs:
     - name: Overwrite envs
       run: |
         if [ "${GITHUB_REF_NAME}" = "stg" ]; then
-          echo "NAMESPACE=stg-${{env.namespace}}" >> $GITHUB_ENV
-          echo "K8S_ENV=stg" >> $GITHUB_ENV;
+          echo "namespace=stg-${{env.namespace}}" >> $GITHUB_ENV
+          echo "k8s_env=stg" >> $GITHUB_ENV;
         elif [ "${GITHUB_REF_NAME}" = "main" ]; then
-          echo "NAMESPACE=${namespace}" >> $GITHUB_ENV
-          echo "K8S_ENV=prod" >> $GITHUB_ENV;
+          echo "namespace=${namespace}" >> $GITHUB_ENV
+          echo "k8s_env=prod" >> $GITHUB_ENV;
         fi
         
-        REPO_NAME=$(basename "$GITHUB_REPOSITORY")
-        echo "REPO_NAME=$REPO_NAME" >> $GITHUB_ENV
+        repo_name=$(basename "$GITHUB_REPOSITORY")
+        echo "repo_name=$repo_name" >> $GITHUB_ENV
 
       shell: bash
 
