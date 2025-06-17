@@ -175,6 +175,7 @@ jobs:
           etcd_user: ${{ env.ARC_ETCD_USER }}
           etcd_password: ${{ env.ARC_ETCD_PASSWORD }}          
           etcd_root: ${{ env.repo_name }}
+          k8s_env: ${{ env.k8s_env }}
 
       - name: Deploy to Kubernetes
         uses: HerodotusDev/cicd/.github/actions/deploy-to-k8s@feat/env_standards
