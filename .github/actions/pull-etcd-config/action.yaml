@@ -69,6 +69,7 @@ runs:
           echo "there was no key"
           echo "no_key=true" >> $GITHUB_OUTPUT
         else
+          echo "${{ inputs.etcd_root }}/${{inputs.k8s_env}}/${{ inputs.app_name }}/.env"
           echo "no_key=false" >> $GITHUB_OUTPUT
         fi
 
