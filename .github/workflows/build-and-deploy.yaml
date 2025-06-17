@@ -7,6 +7,7 @@ env:
   rollout_timeout: 300       
   version_file: ./package.json  
   inputs_files: ./k8s/cicd-inputs.yaml
+  dockerhub_project: dataprocessor
   
 permissions:
   contents: write
