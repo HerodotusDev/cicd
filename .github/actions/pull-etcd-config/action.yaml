@@ -29,6 +29,9 @@ inputs:
   service_account_token:
     description: "Service account token for Kubernetes authentication."
     required: true
+  k8s_env:
+    required: true
+    description:  "k8s env"
 
 outputs:
   no_key:
