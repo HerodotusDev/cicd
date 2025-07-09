@@ -122,7 +122,7 @@ jobs:
           version: ${{ needs.version.outputs.version }}
           docker_username: ${{ env.ARC_DOCKER_USERNAME }}
           docker_password: ${{ env.ARC_DOCKER_PASSWORD }}
-          dockerfile: ./docker/Dockerfile.${{ matrix.app }}
+          dockerfile: ${{ env.dockerfile }}
 
   create-git-tag:
     needs: [version, build-and-push-image, guard]
