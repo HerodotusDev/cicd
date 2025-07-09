@@ -22,6 +22,7 @@ jobs:
     needs: [guard]
     outputs:
       matrix_apps: ${{ steps.define-matrix.outputs.matrix_apps }}
+      matrix_init: ${{ steps.define-matrix-init.outputs.matrix_init }}      
     steps:
       - name: Checkout Caller Repository
         uses: actions/checkout@v4

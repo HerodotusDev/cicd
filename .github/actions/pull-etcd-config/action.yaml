@@ -52,6 +52,7 @@ runs:
       continue-on-error: true
       env:
         etcd_root_override: ${{ inputs.etcd_root == '' && env.namespace || inputs.etcd_root }}
+        app_name_override: ${{ inputs.etcd_root == '' && env.namespace || inputs.etcd_key }}
       shell: bash
       run: |
         set -e
@@ -59,7 +60,7 @@ runs:
           -e ETCD_HOST="${{ inputs.etcd_host }}" \
           -e ETCD_USER="${{ inputs.etcd_user }}" \
           -e ETCD_PASSWORD="${{ inputs.etcd_password }}" \
-          -e ETCD_KEY="/${{ inputs.etcd_root }}/${{inputs.k8s_env}}/${{ inputs.app_name }}/.env" \
+          -e ETCD_KEY="/${{ inputs.etcd_root }}/${{inputs.k8s_env}}/${{ inputs.app_name_override }}/.env" \
           -e APP_NAME="${{ inputs.app_name }}" \
           -e NAMESPACE="${{ inputs.namespace }}" \
           -v "${{ github.workspace }}/output:/output" \
@@ -69,7 +70,7 @@ runs:
           echo "there was no key"
           echo "no_key=true" >> $GITHUB_OUTPUT
         else
-          echo "${{ inputs.etcd_root }}/${{inputs.k8s_env}}/${{ inputs.app_name }}/.env"
+          echo "${{ inputs.etcd_root }}/${{inputs.k8s_env}}/${{ inputs.app_name_override }}/.env"
           echo "no_key=false" >> $GITHUB_OUTPUT
         fi
 
