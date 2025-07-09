@@ -115,7 +115,7 @@ jobs:
         uses: HerodotusDev/cicd/.github/actions/build-and-push-image@env_storageproofs
         env:
           overwrite_dockerfile: storage-proofs
-          dockerfile: ${{ env.REPO_NAME == 'HerodotusDev/backend' && 'overwrite_dockerfile' || matrix.app }}          
+          dockerfile: ${{ github.repository == 'HerodotusDev/backend' && 'overwrite_dockerfile' || matrix.app }}          
         with:
           dockerhub_project: ${{ env.dockerhub_project }}
           app_name: ${{ matrix.app }}
