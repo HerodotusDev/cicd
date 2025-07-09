@@ -85,7 +85,7 @@ runs:
       if: ${{ steps.check_image.outputs.image_exists == 'false' }}
       with:
         context: ${{ inputs.context }}
-        file: ${{ inputs.dockerfile }}
+        file: ./docker/Dockerfile.${{ inputs.dockerfile }}
         push: true
         cache-from: type=gha
         cache-to: type=gha,mode=max
