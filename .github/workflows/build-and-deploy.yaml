@@ -175,7 +175,7 @@ jobs:
 
       - name: Update deployment YAML with image tag
         run: |
-          sed -i "s|<IMAGE>|${{ env.dockerhub_project }}/${{ matrix.app }}:${{ needs.version.outputs.version }}|g" "./k8s/${{ inputs.k8s_env }}/${{ matrix.app }}-pod.yaml"
+          sed -i "s|<IMAGE>|${{ env.dockerhub_project }}/${{ matrix.app }}:${{ needs.version.outputs.version }}|g" "./k8s/${{ env.k8s_env }}/${{ matrix.app }}-pod.yaml"
         shell: bash
           
       - name: Delete pod if it exists
@@ -193,7 +193,7 @@ jobs:
         run: |
           if [ -f "./k8s/${{ inputs.k8s_env }}/${{ matrix.app }}-pod.yaml" ]; then
             echo "Deployment file exists. Applying manifest..."
-            kubectl apply --namespace "${{ env.namespace }}" -f "./k8s/${{ inputs.k8s_env }}/${{ matrix.app }}-pod.yaml"
+            kubectl apply --namespace "${{ env.namespace }}" -f "./k8s/${{ env.k8s_env }}/${{ matrix.app }}-pod.yaml"
           else
             echo "No Deployment file found. Skipping deployment."
           fi
