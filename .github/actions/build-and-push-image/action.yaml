@@ -83,6 +83,12 @@ runs:
     - name: Build and push Docker image
       uses: docker/build-push-action@v6
       if: ${{ steps.check_image.outputs.image_exists == 'false' }}
+      env:
+        # original input: e.g. "storage-proofs-foo"
+        RAW_APP: ${{ inputs.app_name }}
+        # strip "storage-proofs-" and prepend "app-"
+        app_name: ${{ format('app-{0}', replace(env.RAW_APP, 'storage-proofs-', '')) }}   
+      
       with:
         context: ${{ inputs.context }}
         file: ./docker/Dockerfile.${{ inputs.dockerfile }}
@@ -94,4 +100,4 @@ runs:
           ${{ env.IMAGE }}:latest
           ${{ env.IMAGE }}:${{ inputs.version }}
         build-args: |
-          APP_NAME=app-${{ inputs.app_name }}
+          APP_NAME=app-${{ env.app_name }}
