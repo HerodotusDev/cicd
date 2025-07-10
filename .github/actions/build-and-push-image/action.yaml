@@ -80,15 +80,19 @@ runs:
         endpoint: "dataprocessor/github"
         install: true
 
+    - name: Compute APP_NAME
+      #if: github.repository == 'HerodotusDev/backend'
+      shell: bash
+      env:
+        RAW_APP: ${{ inputs.app_name }}
+      run: |
+        # remove leading "storage-proofs-" if present
+        STRIPPED="${RAW_APP#storage-proofs-}"
+        echo "APP_NAME=app-$STRIPPED" >> $GITHUB_ENV        
+
     - name: Build and push Docker image
       uses: docker/build-push-action@v6
       if: ${{ steps.check_image.outputs.image_exists == 'false' }}
-      env:
-        # original input: e.g. "storage-proofs-foo"
-        RAW_APP: ${{ inputs.app_name }}
-        # strip "storage-proofs-" and prepend "app-"
-        app_name: ${{ format('app-{0}', replace(env.RAW_APP, 'storage-proofs-', '')) }}   
-      
       with:
         context: ${{ inputs.context }}
         file: ./docker/Dockerfile.${{ inputs.dockerfile }}
