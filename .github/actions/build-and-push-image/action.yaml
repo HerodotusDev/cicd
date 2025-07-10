@@ -88,7 +88,7 @@ runs:
       run: |
         # remove leading "storage-proofs-" if present
         STRIPPED="${RAW_APP#storage-proofs-}"
-        echo "APP_NAME=app-$STRIPPED" >> $GITHUB_ENV        
+        echo "app_name=$STRIPPED" >> $GITHUB_ENV        
 
     - name: Build and push Docker image
       uses: docker/build-push-action@v6
