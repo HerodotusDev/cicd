@@ -16,7 +16,7 @@ jobs:
   guard:
     runs-on: ubuntu-latest
     steps:
-      - uses: HerodotusDev/cicd/.github/actions/guard-branch@feat/env_standards
+      - uses: HerodotusDev/cicd/.github/actions/guard-branch@env_storageproofs
   define-matrix:
     runs-on: hero-arc-runners
     needs: [guard]
@@ -33,7 +33,7 @@ jobs:
 
       - name: Load App Names
         id: load-app-names
-        uses: HerodotusDev/cicd/.github/actions/load-inputs@feat/env_standards
+        uses: HerodotusDev/cicd/.github/actions/load-inputs@env_storageproofs
         with:
           inputs_file: ${{env.inputs_files}}
 
@@ -41,6 +41,11 @@ jobs:
         id: define-matrix
         run: |
           echo 'matrix_apps=${{ env.app_names }}' >> "$GITHUB_OUTPUT"
+
+      - name: Define apps matrix
+        id: define-matrix-init
+        run: |
+          echo 'matrix_init=${{ env.init_pods }}' >> "$GITHUB_OUTPUT"                    
 
   siren:
     needs: [guard]
@@ -76,12 +81,12 @@ jobs:
 
       - name: Load Inputs from YAML
         id: load-inputs
-        uses: HerodotusDev/cicd/.github/actions/load-inputs@feat/env_standards
+        uses: HerodotusDev/cicd/.github/actions/load-inputs@env_storageproofs
         with:
           inputs_file: ${{env.inputs_files}}
 
       - name: Extract Version
-        uses: HerodotusDev/cicd/.github/actions/extract-version@feat/env_standards
+        uses: HerodotusDev/cicd/.github/actions/extract-version@env_storageproofs
         id: version
         with:
           file: ${{ env.version_file }}
@@ -102,22 +107,21 @@ jobs:
 
       - name: Load Inputs from YAML
         id: load-inputs
-        uses: HerodotusDev/cicd/.github/actions/load-inputs@feat/env_standards
+        uses: HerodotusDev/cicd/.github/actions/load-inputs@env_storageproofs
         with:
           inputs_file: ${{env.inputs_files}}
 
       - name: Build and push image
-        uses: HerodotusDev/cicd/.github/actions/build-and-push-image@feat/env_standards
+        uses: HerodotusDev/cicd/.github/actions/build-and-push-image@env_storageproofs
         env:
-          overwrite_dockerfile: storage-proofs
-          dockerfile: ${{ env.REPO_NAME == 'backend' && 'overwrite_dockerfile' || matrix.app }}          
+          dockerfile: ${{ github.repository == 'HerodotusDev/backend' && 'storage-proofs' || matrix.app }}          
         with:
           dockerhub_project: ${{ env.dockerhub_project }}
           app_name: ${{ matrix.app }}
           version: ${{ needs.version.outputs.version }}
           docker_username: ${{ env.ARC_DOCKER_USERNAME }}
           docker_password: ${{ env.ARC_DOCKER_PASSWORD }}
-          dockerfile: ./docker/Dockerfile.${{ matrix.app }}
+          dockerfile: ${{ env.dockerfile }}
 
   create-git-tag:
     needs: [version, build-and-push-image, guard]
@@ -132,15 +136,78 @@ jobs:
 
       - name: Load Inputs from YAML
         id: load-inputs
-        uses: HerodotusDev/cicd/.github/actions/load-inputs@feat/env_standards
+        uses: HerodotusDev/cicd/.github/actions/load-inputs@env_storageproofs
         with:
           inputs_file: ${{env.inputs_files}}
 
       - name: Create Git tag
-        uses: HerodotusDev/cicd/.github/actions/create-git-tag@feat/env_standards
+        uses: HerodotusDev/cicd/.github/actions/create-git-tag@env_storageproofs
         with:
           tag: ${{ needs.version.outputs.version }}
           token: ${{ secrets.GITHUB_TOKEN }}
+
+  deploy-init-pods:
+    needs: [define-matrix, version, create-git-tag, build-and-push-image, guard]
+    runs-on: hero-arc-runners
+    strategy:
+      matrix:
+        app: ${{ fromJson(needs.define-matrix.outputs.matrix_init) }}
+    if: ${{ needs.define-matrix.outputs.matrix_init != '' }}
+
+    steps:
+      - name: Checkout Caller Repository
+        uses: actions/checkout@v4
+        with:
+          repository: ${{ github.repository }}
+          ref: ${{ github.ref }}
+          token: ${{ secrets.GITHUB_TOKEN }}  
+                  
+      - name: Load Inputs from YAML
+        id: load-inputs
+        uses: HerodotusDev/cicd/.github/actions/load-inputs@env_storageproofs
+        with:
+          inputs_file: ./k8s/cicd-inputs.yaml          
+
+      - name: Set up kubectl
+        uses: azure/setup-kubectl@v4
+        with:
+          version: "v1.32.0"
+
+      - name: Update deployment YAML with image tag
+        run: |
+          sed -i "s|<IMAGE>|${{ env.dockerhub_project }}/${{ matrix.app }}:${{ needs.version.outputs.version }}|g" "./k8s/${{ env.k8s_env }}/${{ matrix.app }}-pod.yaml"
+        shell: bash
+          
+      - name: Delete pod if it exists
+        shell: bash
+        run: |
+          POD="${{ matrix.app }}"
+          if kubectl get pod "$POD" -n "${{ env.namespace }}" | grep -q&> /dev/null; then
+            echo "Deleting pod $POD"
+            kubectl delete pod "$POD" -n "${{ env.namespace }}" 
+          else
+            echo "Pod $POD not found, skipping."
+          fi
+
+      - name: Deploy Deployment YAML (if exists)
+        run: |
+          if [ -f "./k8s/${{ env.k8s_env }}/${{ matrix.app }}-pod.yaml" ]; then
+            echo "Deployment file exists. Applying manifest..."
+            kubectl apply --namespace "${{ env.namespace }}" -f "./k8s/${{ env.k8s_env }}/${{ matrix.app }}-pod.yaml"
+          else
+            echo "No Deployment file found. Skipping deployment."
+          fi
+        shell: bash   
+
+      - name: Wait for Pod to complete
+        run: |
+          kubectl wait \
+            --for=jsonpath='{.status.phase}'=Succeeded \
+            pod/${{ matrix.app}} \
+            --namespace "${{ env.namespace }}" \
+            --timeout=${{ env.rollout_timeout }}s
+        shell: bash
+                  
 
   deploy:
     needs: [define-matrix, version, create-git-tag, build-and-push-image, guard]
@@ -161,15 +228,15 @@ jobs:
 
       - name: Load Inputs from YAML
         id: load-inputs
-        uses: HerodotusDev/cicd/.github/actions/load-inputs@feat/env_standards
+        uses: HerodotusDev/cicd/.github/actions/load-inputs@env_storageproofs
         with:
           inputs_file: ${{env.inputs_files}}
+
       - name: Pull  config from etcd
         id: pull_config
-        uses: HerodotusDev/cicd/.github/actions/pull-etcd-config@feat/env_standards
+        uses: HerodotusDev/cicd/.github/actions/pull-etcd-config@env_storageproofs
         env:
-          overwrite_app_name: storage-proofs
-          app_name: ${{ env.REPO_NAME == 'backend' && 'overwrite_app_name' || matrix.app }}        
+          app_name: ${{ github.repository == 'HerodotusDev/backend' && 'storage-proofs' || matrix.app }}        
         with:
           namespace: ${{ env.namespace }}
           app_name: ${{ env.app_name }}
@@ -179,7 +246,7 @@ jobs:
           k8s_env: ${{ env.k8s_env }}
 
       - name: Deploy to Kubernetes
-        uses: HerodotusDev/cicd/.github/actions/deploy-to-k8s@feat/env_standards
+        uses: HerodotusDev/cicd/.github/actions/deploy-to-k8s@env_storageproofs
         with:
           namespace: ${{ env.namespace }}
           deployment_file: ./k8s/${{ env.k8s_env }}/${{ matrix.app }}-deployment.yaml
