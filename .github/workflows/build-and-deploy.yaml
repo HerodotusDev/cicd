@@ -191,7 +191,7 @@ jobs:
 
       - name: Deploy Deployment YAML (if exists)
         run: |
-          if [ -f "./k8s/${{ inputs.k8s_env }}/${{ matrix.app }}-pod.yaml" ]; then
+          if [ -f "./k8s/${{ env.k8s_env }}/${{ matrix.app }}-pod.yaml" ]; then
             echo "Deployment file exists. Applying manifest..."
             kubectl apply --namespace "${{ env.namespace }}" -f "./k8s/${{ env.k8s_env }}/${{ matrix.app }}-pod.yaml"
           else
@@ -231,6 +231,7 @@ jobs:
         uses: HerodotusDev/cicd/.github/actions/load-inputs@env_storageproofs
         with:
           inputs_file: ${{env.inputs_files}}
+
       - name: Pull  config from etcd
         id: pull_config
         uses: HerodotusDev/cicd/.github/actions/pull-etcd-config@env_storageproofs
