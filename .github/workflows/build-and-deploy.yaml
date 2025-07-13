@@ -242,7 +242,7 @@ jobs:
           app_name: ${{ env.app_name }}
           etcd_user: ${{ env.ARC_ETCD_USER }}
           etcd_password: ${{ env.ARC_ETCD_PASSWORD }}          
-          etcd_root: ${{ env.repo_name }}
+          etcd_root: ${{ env.etcd_root || env.repo_name }}
           k8s_env: ${{ env.k8s_env }}
 
       - name: Deploy to Kubernetes
