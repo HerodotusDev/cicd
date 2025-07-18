@@ -182,9 +182,9 @@ jobs:
         shell: bash
         run: |
           POD="${{ matrix.app }}"
-          if kubectl get pod "$POD" -n "${{ env.namespace }}" | grep -q&> /dev/null; then
+          if kubectl get pod "$POD" -n "${{ env.namespace }}" > /dev/null 2>&1; then
             echo "Deleting pod $POD"
-            kubectl delete pod "$POD" -n "${{ env.namespace }}" 
+            kubectl delete pod "$POD" -n "${{ env.namespace }}"
           else
             echo "Pod $POD not found, skipping."
           fi
