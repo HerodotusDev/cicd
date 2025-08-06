@@ -226,18 +226,18 @@ jobs:
         with:
           inputs_file: ${{env.inputs_files}}
 
-      - name: Pull  config from etcd
-        id: pull_config
-        uses: HerodotusDev/cicd/.github/actions/pull-etcd-config@env_storageproofs
-        env:
-          app_name: ${{ github.repository == 'HerodotusDev/backend' && 'storage-proofs' || matrix.app }}        
-        with:
-          namespace: ${{ env.namespace }}
-          app_name: ${{ env.app_name }}
-          etcd_user: ${{ env.ARC_ETCD_USER }}
-          etcd_password: ${{ env.ARC_ETCD_PASSWORD }}          
-          etcd_root: ${{ env.etcd_root || env.repo_name }}
-          k8s_env: ${{ env.k8s_env }}
+#      - name: Pull  config from etcd
+#        id: pull_config
+#        uses: HerodotusDev/cicd/.github/actions/pull-etcd-config@env_storageproofs
+#        env:
+#          app_name: ${{ github.repository == 'HerodotusDev/backend' && 'storage-proofs' || matrix.app }}        
+#        with:
+#          namespace: ${{ env.namespace }}
+#          app_name: ${{ env.app_name }}
+#          etcd_user: ${{ env.ARC_ETCD_USER }}
+#          etcd_password: ${{ env.ARC_ETCD_PASSWORD }}          
+#          etcd_root: ${{ env.etcd_root || env.repo_name }}
+#          k8s_env: ${{ env.k8s_env }}
 
       - name: Deploy to Kubernetes
         uses: HerodotusDev/cicd/.github/actions/deploy-to-k8s@env_storageproofs
