@@ -29,7 +29,7 @@ jobs:
 
       - name: Load App Names
         id: load-app-names
-        uses: HerodotusDev/cicd/.github/actions/load-inputs@env_storageproofs
+        uses: HerodotusDev/cicd/.github/actions/load-inputs@gcp
         with:
           inputs_file: ${{env.inputs_files}}
 
@@ -75,12 +75,12 @@ jobs:
 
       - name: Load Inputs from YAML
         id: load-inputs
-        uses: HerodotusDev/cicd/.github/actions/load-inputs@env_storageproofs
+        uses: HerodotusDev/cicd/.github/actions/load-inputs@gcp
         with:
           inputs_file: ${{env.inputs_files}}
 
       - name: Extract Version
-        uses: HerodotusDev/cicd/.github/actions/extract-version@env_storageproofs
+        uses: HerodotusDev/cicd/.github/actions/extract-version@gcp
         id: version
         with:
           file: ${{ env.version_file }}
@@ -101,12 +101,12 @@ jobs:
 
       - name: Load Inputs from YAML
         id: load-inputs
-        uses: HerodotusDev/cicd/.github/actions/load-inputs@env_storageproofs
+        uses: HerodotusDev/cicd/.github/actions/load-inputs@gcp
         with:
           inputs_file: ${{env.inputs_files}}
 
       - name: Build and push image
-        uses: HerodotusDev/cicd/.github/actions/build-and-push-image@env_storageproofs
+        uses: HerodotusDev/cicd/.github/actions/build-and-push-image@gcp
         env:
           dockerfile: ${{ github.repository == 'HerodotusDev/backend' && 'storage-proofs' || matrix.app }}          
         with:
@@ -130,12 +130,12 @@ jobs:
 
       - name: Load Inputs from YAML
         id: load-inputs
-        uses: HerodotusDev/cicd/.github/actions/load-inputs@env_storageproofs
+        uses: HerodotusDev/cicd/.github/actions/load-inputs@gcp
         with:
           inputs_file: ${{env.inputs_files}}
 
       - name: Create Git tag
-        uses: HerodotusDev/cicd/.github/actions/create-git-tag@env_storageproofs
+        uses: HerodotusDev/cicd/.github/actions/create-git-tag@gcp
         with:
           tag: ${{ needs.version.outputs.version }}
           token: ${{ secrets.GITHUB_TOKEN }}
@@ -158,7 +158,7 @@ jobs:
                   
       - name: Load Inputs from YAML
         id: load-inputs
-        uses: HerodotusDev/cicd/.github/actions/load-inputs@env_storageproofs
+        uses: HerodotusDev/cicd/.github/actions/load-inputs@gcp
         with:
           inputs_file: ./k8s/cicd-inputs.yaml          
 
@@ -222,13 +222,13 @@ jobs:
 
       - name: Load Inputs from YAML
         id: load-inputs
-        uses: HerodotusDev/cicd/.github/actions/load-inputs@env_storageproofs
+        uses: HerodotusDev/cicd/.github/actions/load-inputs@gcp
         with:
           inputs_file: ${{env.inputs_files}}
 
 #      - name: Pull  config from etcd
 #        id: pull_config
-#        uses: HerodotusDev/cicd/.github/actions/pull-etcd-config@env_storageproofs
+#        uses: HerodotusDev/cicd/.github/actions/pull-etcd-config@gcp
 #        env:
 #          app_name: ${{ github.repository == 'HerodotusDev/backend' && 'storage-proofs' || matrix.app }}        
 #        with:
@@ -240,7 +240,7 @@ jobs:
 #          k8s_env: ${{ env.k8s_env }}
 
       - name: Deploy to Kubernetes
-        uses: HerodotusDev/cicd/.github/actions/deploy-to-k8s@env_storageproofs
+        uses: HerodotusDev/cicd/.github/actions/deploy-to-k8s@gcp
         with:
           namespace: ${{ env.namespace }}
           deployment_file: ./k8s/${{ env.k8s_env }}/${{ matrix.app }}-deployment.yaml
