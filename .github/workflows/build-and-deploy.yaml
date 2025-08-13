@@ -230,7 +230,7 @@ jobs:
         id: pull_config
         uses: HerodotusDev/cicd/.github/actions/pull-etcd-config@gcp
         env:
-          app_name: ${{ github.repository == 'HerodotusDev/backend' && 'storage-proofs' || matrix.app }}
+          app_name: ${{ github.repository == 'HerodotusDev/backend' && 'storage-proofs' || matrix.app }}        
         with:
           namespace: ${{ env.namespace }}
           app_name: ${{ env.app_name }}
