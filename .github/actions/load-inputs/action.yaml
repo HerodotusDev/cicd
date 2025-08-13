@@ -60,7 +60,7 @@ runs:
 
     - name: Overwrite envs
       run: |
-        if [ "${GITHUB_REF_NAME}" = "gcp_test" ]; then
+        if [ "${GITHUB_REF_NAME}" = "gcp" ]; then
           echo "namespace=stg-${{env.namespace}}" >> $GITHUB_ENV
           echo "k8s_env=stg" >> $GITHUB_ENV;
         elif [ "${GITHUB_REF_NAME}" = "main" ]; then
