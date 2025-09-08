@@ -243,7 +243,7 @@ jobs:
       - name: Deploy ConfigMap (from files if any exist)
         shell: bash
         run: |
-          CONFIGMAP_DIR="./k8s/${{ env.k8s_env }}/${{ matrix.app }}/configmap"
+          CONFIGMAP_DIR="./k8s/${{ env.k8s_env }}/${{ matrix.app }}-configmap"
           CM_NAME="${{ matrix.app }}-cm"
       
           if [ -d "$CONFIGMAP_DIR" ] && [ "$(ls -A "$CONFIGMAP_DIR")" ]; then
