@@ -239,6 +239,17 @@ jobs:
           etcd_root: ${{ env.etcd_root || env.repo_name }}
           k8s_env: ${{ env.k8s_env }}
 
+
+      - name: Deploy configmap (if exists)
+        run: |
+          if [ -f "./k8s/${{ env.k8s_env }}/${{ matrix.app }}-cm.yaml" ]; then
+            echo "Configmap file exists. Applying manifest..."
+            kubectl apply --namespace "${{ env.namespace }}" -f "./k8s/${{ env.k8s_env }}/${{ matrix.app }}-cm.yaml"
+          else
+            echo "No cm file found. Skipping deployment."
+          fi
+        shell: bash             
+
       - name: Deploy to Kubernetes
         uses: HerodotusDev/cicd/.github/actions/deploy-to-k8s@gcp
         with:
