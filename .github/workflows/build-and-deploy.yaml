@@ -239,6 +239,10 @@ jobs:
           etcd_root: ${{ env.etcd_root || env.repo_name }}
           k8s_env: ${{ env.k8s_env }}
 
+      - name: Set up kubectl
+        uses: azure/setup-kubectl@v4
+        with:
+          version: "v1.32.0"
 
       - name: Deploy ConfigMap (from files if any exist)
         shell: bash
