@@ -51,7 +51,7 @@ runs:
       shell: bash
       run: |
         CONFIGMAP_DIR="./k8s/${{ env.k8s_env }}/${{ matrix.app }}-configmap"
-        CM_NAME="${{ matrix.app }}-cm"
+        CM_NAME="${{ matrix.app }}-configmap"
     
         if [ -d "$CONFIGMAP_DIR" ] && [ "$(ls -A "$CONFIGMAP_DIR")" ]; then
           kubectl create configmap "$CM_NAME" \
