@@ -239,25 +239,6 @@ jobs:
           etcd_root: ${{ env.etcd_root || env.repo_name }}
           k8s_env: ${{ env.k8s_env }}
 
-      - name: Set up kubectl
-        uses: azure/setup-kubectl@v4
-        with:
-          version: "v1.32.0"
-
-      - name: Deploy ConfigMap (from files if any exist)
-        shell: bash
-        run: |
-          CONFIGMAP_DIR="./k8s/${{ env.k8s_env }}/${{ matrix.app }}-configmap"
-          CM_NAME="${{ matrix.app }}-cm"
-      
-          if [ -d "$CONFIGMAP_DIR" ] && [ "$(ls -A "$CONFIGMAP_DIR")" ]; then
-            kubectl create configmap "$CM_NAME" \
-              --namespace "${{ env.namespace }}" \
-              $(for f in "$CONFIGMAP_DIR"/*; do echo --from-file="$f"; done)
-          else
-            echo "No files in $CONFIGMAP_DIR, skipping ConfigMap creation."
-          fi   
-
       - name: Deploy to Kubernetes
         uses: HerodotusDev/cicd/.github/actions/deploy-to-k8s@gcp
         with:
