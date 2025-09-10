@@ -46,27 +46,27 @@ runs:
 
     - name: Compute ConfigMap content hash
       id: compute_hash
-      if: steps.detect.outputs.has_files == 'true'
       shell: bash
       run: |
         set -euo pipefail
-        dir="${{ steps.detect.outputs.dir }}"
-        # Hash files deterministically by name and content
-        HASH=$(find "$dir" -type f -print0 | sort -z | xargs -0 sha256sum | sha256sum | awk '{print $1}')
-        echo "hash=$HASH" >> "$GITHUB_OUTPUT"
-
-    - name: Default hash when no files
-      id: compute_hash
-      if: steps.detect.outputs.has_files == 'false'
-      shell: bash
-      run: echo "hash=" >> "$GITHUB_OUTPUT"
+        if [ "${{ steps.detect.outputs.has_files }}" = "true" ]; then
+          dir="${{ steps.detect.outputs.dir }}"
+          # Hash files deterministically by name and content
+          HASH=$(find "$dir" -type f -print0 | sort -z | xargs -0 sha256sum | sha256sum | awk '{print $1}')
+          echo "hash=$HASH" >> "$GITHUB_OUTPUT"
+        else
+          echo "hash=" >> "$GITHUB_OUTPUT"
+        fi
 
     - name: Check previous ConfigMap hash
       id: check_cm_change
-      if: steps.detect.outputs.has_files == 'true'
       shell: bash
       run: |
         set -euo pipefail
+        if [ "${{ steps.detect.outputs.has_files }}" != "true" ]; then
+          echo "changed=false" >> "$GITHUB_OUTPUT"
+          exit 0
+        fi
         CM_NAME="${{ inputs.app_name }}-configmap"
         NS="${{ inputs.namespace }}"
         if kubectl get configmap "$CM_NAME" -n "$NS" &>/dev/null; then
@@ -88,12 +88,6 @@ runs:
           echo "ConfigMap doesn't exist - marking as changed"
           echo "changed=true" >> "$GITHUB_OUTPUT"
         fi
-
-    - name: Default change flag when no files
-      id: check_cm_change
-      if: steps.detect.outputs.has_files == 'false'
-      shell: bash
-      run: echo "changed=false" >> "$GITHUB_OUTPUT"
 
     - name: Generate ConfigMap manifest with files
       if: steps.detect.outputs.has_files == 'true'
