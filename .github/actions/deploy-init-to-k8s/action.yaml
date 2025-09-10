@@ -31,8 +31,8 @@ inputs:
   app_name:
     description: "The application name to form the image name."
     required: true    
-  secret_changed:
-    description: "Whether the secret has changed and deployment needs restart"
+  config_changed:
+    description: "Whether config (secret/configmap) changed and deployment needs restart"
     required: false
     default: "false"
 

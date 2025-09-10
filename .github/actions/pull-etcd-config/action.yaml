@@ -37,7 +37,7 @@ outputs:
   no_key:
     description: "Whether no ETCD key was found"
     value: ${{ steps.pull.outputs.no_key }}
-  secret_changed:
+  config_changed:
     description: "Whether the secret content has changed"
     value: ${{ steps.check_secret_change.outputs.changed }}
   secret_hash:

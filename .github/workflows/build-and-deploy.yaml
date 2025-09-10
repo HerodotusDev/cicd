@@ -211,7 +211,7 @@ jobs:
         app: ${{ fromJson(needs.define-matrix.outputs.matrix_apps) }}
     if: always()
     outputs:
-      secret_changed: ${{ steps.pull_config.outputs.secret_changed }}
+      config_changed: ${{ steps.pull_config.outputs.config_changed || steps.ensure_configmap.outputs.config_changed }}
     steps:
       - name: Checkout Caller Repository
         uses: actions/checkout@v4
@@ -225,6 +225,14 @@ jobs:
         uses: HerodotusDev/cicd/.github/actions/load-inputs@gcp
         with:
           inputs_file: ${{env.inputs_files}}
+
+      - name: Ensure ConfigMap from files
+        id: ensure_configmap
+        uses: HerodotusDev/cicd/.github/actions/create-configmap@gcp
+        with:
+          namespace: ${{ env.namespace }}
+          app_name: ${{ matrix.app }}
+          k8s_env: ${{ env.k8s_env }}
 
       - name: Pull  config from etcd
         id: pull_config
@@ -249,4 +257,4 @@ jobs:
           image_tag: ${{ needs.version.outputs.version }}
           dockerhub_project: ${{ env.dockerhub_project }}
           app_name: ${{ matrix.app }}
-          secret_changed: ${{ steps.pull_config.outputs.secret_changed }}
+          config_changed: ${{ steps.pull_config.outputs.config_changed == 'true' || steps.ensure_configmap.outputs.config_changed == 'true' }}

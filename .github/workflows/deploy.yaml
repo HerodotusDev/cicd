@@ -53,7 +53,7 @@ jobs:
         app: ${{ fromJson(needs.define-matrix.outputs.matrix_apps) }}
     if: always()
     outputs:
-      secret_changed: ${{ steps.pull_config.outputs.secret_changed }}
+      config_changed: ${{ steps.pull_config.outputs.config_changed }}
     steps:
       - name: Checkout Caller Repository
         uses: actions/checkout@v4
@@ -78,4 +78,4 @@ jobs:
           image_tag: ${{ needs.version.outputs.version }}
           dockerhub_project: ${{ env.dockerhub_project }}
           app_name: ${{ matrix.app }}
-          secret_changed: ${{ steps.pull_config.outputs.secret_changed }}
+          config_changed: ${{ steps.pull_config.outputs.config_changed }}
