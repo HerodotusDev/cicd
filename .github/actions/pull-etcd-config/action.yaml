@@ -29,12 +29,15 @@ inputs:
   service_account_token:
     description: "Service account token for Kubernetes authentication."
     required: true
+  k8s_env:
+    required: true
+    description:  "k8s env"
 
 outputs:
   no_key:
     description: "Whether no ETCD key was found"
     value: ${{ steps.pull.outputs.no_key }}
-  secret_changed:
+  config_changed:
     description: "Whether the secret content has changed"
     value: ${{ steps.check_secret_change.outputs.changed }}
   secret_hash:
@@ -49,6 +52,7 @@ runs:
       continue-on-error: true
       env:
         etcd_root_override: ${{ inputs.etcd_root == '' && env.namespace || inputs.etcd_root }}
+        #app_name_override: ${{ inputs.etcd_key == '' && env.namespace || inputs.etcd_key }}
       shell: bash
       run: |
         set -e
@@ -56,7 +60,7 @@ runs:
           -e ETCD_HOST="${{ inputs.etcd_host }}" \
           -e ETCD_USER="${{ inputs.etcd_user }}" \
           -e ETCD_PASSWORD="${{ inputs.etcd_password }}" \
-          -e ETCD_KEY="/${{ env.etcd_root_override }}/${{ inputs.app_name }}/envs/${{ inputs.etcd_key }}" \
+          -e ETCD_KEY="/${{ inputs.etcd_root }}/${{inputs.k8s_env}}/${{ inputs.app_name }}/.env" \
           -e APP_NAME="${{ inputs.app_name }}" \
           -e NAMESPACE="${{ inputs.namespace }}" \
           -v "${{ github.workspace }}/output:/output" \
@@ -66,6 +70,7 @@ runs:
           echo "there was no key"
           echo "no_key=true" >> $GITHUB_OUTPUT
         else
+          echo "${{ inputs.etcd_root }}/${{inputs.k8s_env}}/${{ inputs.app_name }}/.env"
           echo "no_key=false" >> $GITHUB_OUTPUT
         fi
 

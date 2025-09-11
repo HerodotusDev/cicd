@@ -2,24 +2,23 @@ name: Build & deploy
 
 on:
   workflow_call:
-    inputs:    
-      k8s_env:
-        type: string
-        required: false  
-        default: stage
 
 env:
   rollout_timeout: 300       
   version_file: ./package.json  
+  inputs_files: ./k8s/cicd-inputs.yaml
+  dockerhub_project: dataprocessor
   
 permissions:
   contents: write
 
 jobs:
+
   define-matrix:
-    runs-on: hero-arc-runners
+    runs-on: gcp-arc-runners
     outputs:
       matrix_apps: ${{ steps.define-matrix.outputs.matrix_apps }}
+      matrix_init: ${{ steps.define-matrix-init.outputs.matrix_init }}      
     steps:
       - name: Checkout Caller Repository
         uses: actions/checkout@v4
@@ -30,17 +29,22 @@ jobs:
 
       - name: Load App Names
         id: load-app-names
-        uses: HerodotusDev/cicd/.github/actions/load-inputs@main
+        uses: HerodotusDev/cicd/.github/actions/load-inputs@gcp
         with:
-          inputs_file: ./k8s/${{ inputs.k8s_env }}/cicd-inputs.yaml
+          inputs_file: ${{env.inputs_files}}
 
       - name: Define apps matrix
         id: define-matrix
         run: |
           echo 'matrix_apps=${{ env.app_names }}' >> "$GITHUB_OUTPUT"
 
+      - name: Define apps matrix
+        id: define-matrix-init
+        run: |
+          echo 'matrix_init=${{ env.init_pods }}' >> "$GITHUB_OUTPUT"                    
+
   siren:
-    runs-on: hero-arc-runners
+    runs-on: gcp-arc-runners
     if: false
     steps:
       - name: Log in to Docker Hub
@@ -60,7 +64,7 @@ jobs:
   version:
     outputs:
       version: ${{ steps.version.outputs.version }}
-    runs-on: hero-arc-runners
+    runs-on: gcp-arc-runners
     steps:
       - name: Checkout Caller Repository
         uses: actions/checkout@v4
@@ -71,19 +75,19 @@ jobs:
 
       - name: Load Inputs from YAML
         id: load-inputs
-        uses: HerodotusDev/cicd/.github/actions/load-inputs@main
+        uses: HerodotusDev/cicd/.github/actions/load-inputs@gcp
         with:
-          inputs_file: ./k8s/${{ inputs.k8s_env }}/cicd-inputs.yaml
+          inputs_file: ${{env.inputs_files}}
 
       - name: Extract Version
-        uses: HerodotusDev/cicd/.github/actions/extract-version@main
+        uses: HerodotusDev/cicd/.github/actions/extract-version@gcp
         id: version
         with:
           file: ${{ env.version_file }}
 
   build-and-push-image:
     needs: [define-matrix, version]
-    runs-on: hero-arc-runners
+    runs-on: gcp-arc-runners
     strategy:
       matrix:
         app: ${{ fromJson(needs.define-matrix.outputs.matrix_apps) }}
@@ -97,27 +101,25 @@ jobs:
 
       - name: Load Inputs from YAML
         id: load-inputs
-        uses: HerodotusDev/cicd/.github/actions/load-inputs@main
+        uses: HerodotusDev/cicd/.github/actions/load-inputs@gcp
         with:
-          inputs_file: ./k8s/${{ inputs.k8s_env }}/cicd-inputs.yaml
+          inputs_file: ${{env.inputs_files}}
 
       - name: Build and push image
-        uses: HerodotusDev/cicd/.github/actions/build-and-push-image@stg_image_separation
+        uses: HerodotusDev/cicd/.github/actions/build-and-push-image@gcp
         env:
-          overwrite_dockerfile: storage-proofs
-          dockerfile: ${{ env.github.repository == 'HerodotusDev/backend' && 'overwrite_dockerfile' || matrix.app }}          
+          dockerfile: ${{ github.repository == 'HerodotusDev/backend' && 'storage-proofs' || matrix.app }}          
         with:
           dockerhub_project: ${{ env.dockerhub_project }}
           app_name: ${{ matrix.app }}
           version: ${{ needs.version.outputs.version }}
           docker_username: ${{ env.ARC_DOCKER_USERNAME }}
           docker_password: ${{ env.ARC_DOCKER_PASSWORD }}
-          dockerfile: ./docker/Dockerfile.${{ matrix.app }}
-        if: ${{ github.repository }} != "HerodotusDev/backend"      
+          dockerfile: ${{ env.dockerfile }}
 
   create-git-tag:
     needs: [version, build-and-push-image]
-    runs-on: hero-arc-runners 
+    runs-on: gcp-arc-runners 
     steps:
       - name: Checkout Caller Repository
         uses: actions/checkout@v4
@@ -128,25 +130,88 @@ jobs:
 
       - name: Load Inputs from YAML
         id: load-inputs
-        uses: HerodotusDev/cicd/.github/actions/load-inputs@main
+        uses: HerodotusDev/cicd/.github/actions/load-inputs@gcp
         with:
-          inputs_file: ./k8s/${{ inputs.k8s_env }}/cicd-inputs.yaml
+          inputs_file: ${{env.inputs_files}}
 
       - name: Create Git tag
-        uses: HerodotusDev/cicd/.github/actions/create-git-tag@main
+        uses: HerodotusDev/cicd/.github/actions/create-git-tag@gcp
         with:
           tag: ${{ needs.version.outputs.version }}
           token: ${{ secrets.GITHUB_TOKEN }}
 
-  deploy-staging:
+  deploy-init-pods:
     needs: [define-matrix, version, create-git-tag, build-and-push-image]
-    runs-on: hero-arc-runners
+    runs-on: gcp-arc-runners
+    strategy:
+      matrix:
+        app: ${{ fromJson(needs.define-matrix.outputs.matrix_init) }}
+    if: ${{ needs.define-matrix.outputs.matrix_init != '' }}
+
+    steps:
+      - name: Checkout Caller Repository
+        uses: actions/checkout@v4
+        with:
+          repository: ${{ github.repository }}
+          ref: ${{ github.ref }}
+          token: ${{ secrets.GITHUB_TOKEN }}  
+                  
+      - name: Load Inputs from YAML
+        id: load-inputs
+        uses: HerodotusDev/cicd/.github/actions/load-inputs@gcp
+        with:
+          inputs_file: ./k8s/cicd-inputs.yaml          
+
+      - name: Set up kubectl
+        uses: azure/setup-kubectl@v4
+        with:
+          version: "v1.32.0"
+
+      - name: Update deployment YAML with image tag
+        run: |
+          sed -i "s|<IMAGE>|${{ env.dockerhub_project }}/${{ matrix.app }}:${{ needs.version.outputs.version }}|g" "./k8s/${{ env.k8s_env }}/${{ matrix.app }}-pod.yaml"
+        shell: bash
+          
+      - name: Delete pod if it exists
+        shell: bash
+        run: |
+          POD="${{ matrix.app }}"
+          if kubectl get pod "$POD" -n "${{ env.namespace }}" > /dev/null 2>&1; then
+            echo "Deleting pod $POD"
+            kubectl delete pod "$POD" -n "${{ env.namespace }}"
+          else
+            echo "Pod $POD not found, skipping."
+          fi
+
+      - name: Deploy Deployment YAML (if exists)
+        run: |
+          if [ -f "./k8s/${{ env.k8s_env }}/${{ matrix.app }}-pod.yaml" ]; then
+            echo "Deployment file exists. Applying manifest..."
+            kubectl apply --namespace "${{ env.namespace }}" -f "./k8s/${{ env.k8s_env }}/${{ matrix.app }}-pod.yaml"
+          else
+            echo "No Deployment file found. Skipping deployment."
+          fi
+        shell: bash   
+
+      - name: Wait for Pod to complete
+        run: |
+          kubectl wait \
+            --for=jsonpath='{.status.phase}'=Succeeded \
+            pod/${{ matrix.app}} \
+            --namespace "${{ env.namespace }}" \
+            --timeout=${{ env.rollout_timeout }}s
+        shell: bash
+                  
+
+  deploy:
+    needs: [define-matrix, version, create-git-tag, build-and-push-image]
+    runs-on: gcp-arc-runners
     strategy:
       matrix:
         app: ${{ fromJson(needs.define-matrix.outputs.matrix_apps) }}
     if: always()
     outputs:
-      secret_changed: ${{ steps.pull_config.outputs.secret_changed }}
+      config_changed: ${{ steps.pull_config.outputs.config_changed || steps.ensure_configmap.outputs.config_changed }}
     steps:
       - name: Checkout Caller Repository
         uses: actions/checkout@v4
@@ -157,32 +222,39 @@ jobs:
 
       - name: Load Inputs from YAML
         id: load-inputs
-        uses: HerodotusDev/cicd/.github/actions/load-inputs@main
+        uses: HerodotusDev/cicd/.github/actions/load-inputs@gcp
         with:
-          inputs_file: ./k8s/${{ inputs.k8s_env }}/cicd-inputs.yaml
+          inputs_file: ${{env.inputs_files}}
+
+      - name: Ensure ConfigMap from files
+        id: ensure_configmap
+        uses: HerodotusDev/cicd/.github/actions/create-configmap@gcp
+        with:
+          namespace: ${{ env.namespace }}
+          app_name: ${{ matrix.app }}
+          k8s_env: ${{ env.k8s_env }}
+
       - name: Pull  config from etcd
         id: pull_config
-        uses: HerodotusDev/cicd/.github/actions/pull-etcd-config@stg_image_separation
+        uses: HerodotusDev/cicd/.github/actions/pull-etcd-config@gcp
         env:
-          overwrite_app_name: storage-proofs
-          app_name: ${{ env.github.repository == 'HerodotusDev/backend' && 'overwrite_app_name' || matrix.app }}          
+          app_name: ${{ github.repository == 'HerodotusDev/backend' && 'storage-proofs' || matrix.app }}        
         with:
           namespace: ${{ env.namespace }}
           app_name: ${{ env.app_name }}
           etcd_user: ${{ env.ARC_ETCD_USER }}
-          etcd_password: ${{ env.ARC_ETCD_PASSWORD }}
-          etcd_key: ${{ env.etcd_key }}          
-          etcd_root: ${{ env.etcd_root }}
+          etcd_password: ${{ env.ARC_ETCD_PASSWORD }}          
+          etcd_root: ${{ env.etcd_root || env.repo_name }}
+          k8s_env: ${{ env.k8s_env }}
 
       - name: Deploy to Kubernetes
-        uses: HerodotusDev/cicd/.github/actions/deploy-to-k8s@stg_image_separation
+        uses: HerodotusDev/cicd/.github/actions/deploy-to-k8s@gcp
         with:
           namespace: ${{ env.namespace }}
-          etcd_root: ${{ env.etcd_root }}
-          deployment_file: ./k8s/${{ inputs.k8s_env }}/${{ matrix.app }}-deployment.yaml
-          ingress_file: ./k8s/${{ inputs.k8s_env }}/${{ matrix.app }}-ingress.yaml
+          deployment_file: ./k8s/${{ env.k8s_env }}/${{ matrix.app }}-deployment.yaml
+          ingress_file: ./k8s/${{ env.k8s_env }}/${{ matrix.app }}-ingress.yaml
           rollout_timeout: ${{ env.rollout_timeout }}
           image_tag: ${{ needs.version.outputs.version }}
           dockerhub_project: ${{ env.dockerhub_project }}
           app_name: ${{ matrix.app }}
-          secret_changed: ${{ steps.pull_config.outputs.secret_changed }}
+          config_changed: ${{ steps.pull_config.outputs.config_changed == 'true' || steps.ensure_configmap.outputs.config_changed == 'true' }}

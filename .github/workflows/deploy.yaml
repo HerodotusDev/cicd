@@ -2,25 +2,14 @@ name: Deploy version
 
 on:
   workflow_call:
-    inputs:
-      version:
-        description: "Enter version to be deployed"
-        required: true
-        type: string
-      inputs_file:
-        type: string
-        default: ./k8s/cicd-inputs.yaml  
-    secrets:
-      KUBE_CONFIG:
-        required: true
-      ETCD_USER:
-        required: false
-      ETCD_PASSWORD:
-        required: false        
 
+inputs:
+  version:
+    required: yes
+    
 env:
-  deployment_file: ./k8s/deployment.yaml
-  ingress_file: ./k8s/ingress.yaml
+  version_file: ./package.json  
+  inputs_files: ./k8s/cicd-inputs.yaml
   rollout_timeout: 300 
 
 permissions:
@@ -28,62 +17,65 @@ permissions:
 
 jobs:
 
-  load-inputs:
+  guard:
     runs-on: ubuntu-latest
+    steps:
+      - uses: HerodotusDev/cicd/.github/actions/guard-branch@main
+  define-matrix:
+    runs-on: hero-arc-runners
+    needs: [guard]
     outputs:
-      env_vars: ${{ steps.load-inputs.outputs.env_vars }}
+      matrix_apps: ${{ steps.define-matrix.outputs.matrix_apps }}
     steps:
       - name: Checkout Caller Repository
         uses: actions/checkout@v4
         with:
-          repository: ${{ github.repository }}  # ✅ Pull the repository that triggered the workflow
-          ref: ${{ github.ref }}  # ✅ Check out the same branch as the trigger
-          token: ${{ secrets.GITHUB_TOKEN }}  # ✅ Use GitHub token for access
-        
-      - name: Load Inputs from YAML
-        id: load-inputs
+          repository: ${{ github.repository }}
+          ref: ${{ github.ref }}
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Load App Names
+        id: load-app-names
         uses: HerodotusDev/cicd/.github/actions/load-inputs@main
         with:
-          inputs_file: ${{ inputs.inputs_file }}
+          inputs_file: ${{env.inputs_files}}
 
-  deploy-staging:
-    needs: load-inputs
-    runs-on: ubuntu-latest
+      - name: Define apps matrix
+        id: define-matrix
+        run: |
+          echo 'matrix_apps=${{ env.app_names }}' >> "$GITHUB_OUTPUT"
+
+  deploy:
+    needs: [define-matrix, guard]
+    runs-on: hero-arc-runners
+    strategy:
+      matrix:
+        app: ${{ fromJson(needs.define-matrix.outputs.matrix_apps) }}
     if: always()
+    outputs:
+      config_changed: ${{ steps.pull_config.outputs.config_changed }}
     steps:
-
-      - name: Set inputs
-        uses: HerodotusDev/cicd/.github/actions/set-inputs@main
-        with:
-          inputs_data: ${{ needs.load-inputs.outputs.env_vars }}
-
       - name: Checkout Caller Repository
         uses: actions/checkout@v4
         with:
-          repository: ${{ github.repository }}  # ✅ Pull the repository that triggered the workflow
-          ref: ${{ github.ref }}  # ✅ Check out the same branch as the trigger
-          token: ${{ secrets.GITHUB_TOKEN }}  # ✅ Use GitHub token for access
+          repository: ${{ github.repository }}
+          ref: ${{ github.ref }}
+          token: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Pull config from etcd
-        uses: HerodotusDev/cicd/.github/actions/pull-etcd-config@main
-        if: ${{ env.pull_etcd_config == 'true' }}
+      - name: Load Inputs from YAML
+        id: load-inputs
+        uses: HerodotusDev/cicd/.github/actions/load-inputs@feat/env_standards
         with:
-          kube_config: ${{ secrets.KUBE_CONFIG }}
-          namespace: ${{ env.namespace }}
-          app_name: ${{ env.app_name }}
-          etcd_user: ${{ secrets.ETCD_USER }}
-          etcd_password: ${{ secrets.ETCD_PASSWORD }}
-          etcd_key: ${{ env.etcd_key}}
-  
+          inputs_file: ${{env.inputs_files}}
 
       - name: Deploy to Kubernetes
-        uses: HerodotusDev/cicd/.github/actions/deploy-to-k8s@main
+        uses: HerodotusDev/cicd/.github/actions/deploy-to-k8s@feat/env_standards
         with:
-          kube_config: ${{ secrets.KUBE_CONFIG }}
           namespace: ${{ env.namespace }}
-          deployment_file: ${{ env.deployment_file }}
-          ingress_file: ${{ env.ingress_file }}
+          deployment_file: ./k8s/${{ env.k8s_env }}/${{ matrix.app }}-deployment.yaml
+          ingress_file: ./k8s/${{ env.k8s_env }}/${{ matrix.app }}-ingress.yaml
           rollout_timeout: ${{ env.rollout_timeout }}
-          image_tag: ${{ inputs.version }}
+          image_tag: ${{ needs.version.outputs.version }}
           dockerhub_project: ${{ env.dockerhub_project }}
-          app_name: ${{ env.app_name }}
+          app_name: ${{ matrix.app }}
+          config_changed: ${{ steps.pull_config.outputs.config_changed }}

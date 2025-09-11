@@ -31,8 +31,8 @@ inputs:
   app_name:
     description: "The application name to form the image name."
     required: true    
-  secret_changed:
-    description: "Whether the secret has changed and deployment needs restart"
+  config_changed:
+    description: "Whether config (secret/configmap) changed and deployment needs restart"
     required: false
     default: "false"
 
@@ -47,9 +47,10 @@ runs:
       with:
         version: "v1.32.0"
 
+
     - name: Update deployment YAML with image tag
       run: |
-        sed -i "s|<IMAGE>|${{ inputs.dockerhub_project }}/${{ github.ref_name != 'main' && 'stg-' || '' }}${{ inputs.app_name }}:${{ inputs.image_tag }}|g" "${{ inputs.deployment_file }}"
+        sed -i "s|<IMAGE>|${{ inputs.dockerhub_project }}/${{ (github.ref_name != 'gcp-main' && github.ref_name != 'main') && 'stg-' || '' }}${{ inputs.app_name }}:${{ inputs.image_tag }}|g" "${{ inputs.deployment_file }}"
       shell: bash
       
     - name: Deploy Deployment YAML (if exists)
@@ -77,15 +78,25 @@ runs:
         kubectl rollout status deployment/"${{ inputs.app_name }}" --namespace "${{ inputs.namespace }}" --timeout=${{ inputs.rollout_timeout }}s
       shell: bash
 
-    - name: Restart Deployment if Secret Changed
-      if: inputs.secret_changed == 'true'
+    - name: Restart Deployment if Config Changed
+      if: inputs.config_changed == 'true'
       run: |
-        echo "Secret changed - restarting deployment..."
+        echo "Config changed - restarting deployment ${{ inputs.app_name }}..."
         kubectl rollout restart deployment/${{ inputs.app_name }} -n ${{ inputs.namespace }}
+        if [ "${{ inputs.app_name }}" = "atlantic-server" ]; then
+          echo "Also restarting atlantic-workers due to atlantic-server secret change..."
+          kubectl rollout restart deployment/atlantic-workers -n ${{ inputs.namespace }}
+        fi
       shell: bash
 
     - name: Wait for restart to complete
-      if: inputs.secret_changed == 'true'
+      if: inputs.config_changed == 'true'
       run: |
         kubectl rollout status deployment/"${{ inputs.app_name }}" --namespace "${{ inputs.namespace }}" --timeout=${{ inputs.rollout_timeout }}s
+      shell: bash
+
+    - name: Wait for workers restart to complete
+      if: inputs.config_changed == 'true' && inputs.app_name == 'atlantic-server'
+      run: |
+        kubectl rollout status deployment/atlantic-workers --namespace "${{ inputs.namespace }}" --timeout=${{ inputs.rollout_timeout }}s
       shell: bash

@@ -58,3 +58,18 @@ runs:
         echo "✅ All variables loaded successfully"
       shell: bash
 
+    - name: Overwrite envs
+      run: |
+        if [ "${GITHUB_REF_NAME}" = "gcp-develop" ] || [ "${GITHUB_REF_NAME}" = "develop" ]; then
+          echo "namespace=stg-${{env.namespace}}" >> $GITHUB_ENV
+          echo "k8s_env=stg" >> $GITHUB_ENV;
+        elif [ "${GITHUB_REF_NAME}" = "gcp-main" ] || [ "${GITHUB_REF_NAME}" = "main" ]; then
+          echo "namespace=prod-${namespace}" >> $GITHUB_ENV
+          echo "k8s_env=prod" >> $GITHUB_ENV;
+        fi
+        
+        repo_name=$(basename "$GITHUB_REPOSITORY")
+        echo "repo_name=$repo_name" >> $GITHUB_ENV
+
+      shell: bash
+

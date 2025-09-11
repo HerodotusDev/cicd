@@ -48,8 +48,12 @@ runs:
       run: |
         BRANCH=${GITHUB_REF#refs/heads/}    # strip off “refs/heads/”
         PREFIX=""
-        if [[ "$BRANCH" != "main" ]]; then
+        if [[ "$BRANCH" == "gcp-develop" || "$BRANCH" == "develop" ]]; then
           PREFIX="stg-"
+        elif [[ "$BRANCH" == "gcp-main" || "$BRANCH" == "main" ]]; then
+          PREFIX=""
+        else
+          PREFIX="dev-"
         fi
         echo "IMAGE=${{ inputs.dockerhub_project }}/${PREFIX}${{ inputs.app_name }}" >> $GITHUB_ENV
 
@@ -76,12 +80,22 @@ runs:
         endpoint: "dataprocessor/github"
         install: true
 
+    - name: Compute APP_NAME
+      #if: github.repository == 'HerodotusDev/backend'
+      shell: bash
+      env:
+        RAW_APP: ${{ inputs.app_name }}
+      run: |
+        # remove leading "storage-proofs-" if present
+        STRIPPED="${RAW_APP#storage-proofs-}"
+        echo "app_name=$STRIPPED" >> $GITHUB_ENV        
+
     - name: Build and push Docker image
       uses: docker/build-push-action@v6
       if: ${{ steps.check_image.outputs.image_exists == 'false' }}
       with:
         context: ${{ inputs.context }}
-        file: ${{ inputs.dockerfile }}
+        file: ./docker/Dockerfile.${{ inputs.dockerfile }}
         push: true
         cache-from: type=gha
         cache-to: type=gha,mode=max
@@ -90,4 +104,4 @@ runs:
           ${{ env.IMAGE }}:latest
           ${{ env.IMAGE }}:${{ inputs.version }}
         build-args: |
-          APP_NAME=app-${{ inputs.app_name }}
+          APP_NAME=app-${{ env.app_name }}
