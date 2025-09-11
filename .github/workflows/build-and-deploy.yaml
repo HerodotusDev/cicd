@@ -167,6 +167,19 @@ jobs:
         with:
           version: "v1.32.0"
 
+      - name: Build and push image
+        uses: HerodotusDev/cicd/.github/actions/build-and-push-image@gcp
+        env:
+          dockerfile: ${{ github.repository == 'HerodotusDev/backend' && 'storage-proofs' || matrix.app }}          
+        with:
+          dockerhub_project: ${{ env.dockerhub_project }}
+          app_name: ${{ matrix.app }}
+          version: ${{ needs.version.outputs.version }}
+          docker_username: ${{ env.ARC_DOCKER_USERNAME }}
+          docker_password: ${{ env.ARC_DOCKER_PASSWORD }}
+          dockerfile: ${{ env.dockerfile }}
+    
+
       - name: Update deployment YAML with image tag
         run: |
           sed -i "s|<IMAGE>|${{ env.dockerhub_project }}/${{ matrix.app }}:${{ needs.version.outputs.version }}|g" "./k8s/${{ env.k8s_env }}/${{ matrix.app }}-pod.yaml"
