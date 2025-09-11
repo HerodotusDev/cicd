@@ -50,7 +50,7 @@ runs:
 
     - name: Update deployment YAML with image tag
       run: |
-        sed -i "s|<IMAGE>|${{ inputs.dockerhub_project }}/${{ github.ref_name != 'gcp-main' && 'stg-' || '' }}${{ inputs.app_name }}:${{ inputs.image_tag }}|g" "${{ inputs.deployment_file }}"
+        sed -i "s|<IMAGE>|${{ inputs.dockerhub_project }}/${{ (github.ref_name != 'gcp-main' && github.ref_name != 'main') && 'stg-' || '' }}${{ inputs.app_name }}:${{ inputs.image_tag }}|g" "${{ inputs.deployment_file }}"
       shell: bash
       
     - name: Deploy Deployment YAML (if exists)
