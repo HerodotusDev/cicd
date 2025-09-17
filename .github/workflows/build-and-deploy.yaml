@@ -222,7 +222,6 @@ jobs:
     strategy:
       matrix:
         app: ${{ fromJson(needs.define-matrix.outputs.matrix_apps) }}
-    if: always()
     outputs:
       config_changed: ${{ steps.pull_config.outputs.config_changed || steps.ensure_configmap.outputs.config_changed }}
     steps:
