@@ -15,7 +15,7 @@ permissions:
 jobs:
 
   define-matrix:
-    runs-on: gcp-arc-runners
+    runs-on: main-arc-runners
     outputs:
       matrix_apps: ${{ steps.define-matrix.outputs.matrix_apps }}
       matrix_init: ${{ steps.define-matrix-init.outputs.matrix_init }}      
@@ -29,7 +29,7 @@ jobs:
 
       - name: Load App Names
         id: load-app-names
-        uses: HerodotusDev/cicd/.github/actions/load-inputs@gcp
+        uses: HerodotusDev/cicd/.github/actions/load-inputs@main
         with:
           inputs_file: ${{env.inputs_files}}
 
@@ -44,7 +44,7 @@ jobs:
           echo 'matrix_init=${{ env.init_pods }}' >> "$GITHUB_OUTPUT"                    
 
   siren:
-    runs-on: gcp-arc-runners
+    runs-on: main-arc-runners
     if: false
     steps:
       - name: Log in to Docker Hub
@@ -64,7 +64,7 @@ jobs:
   version:
     outputs:
       version: ${{ steps.version.outputs.version }}
-    runs-on: gcp-arc-runners
+    runs-on: main-arc-runners
     steps:
       - name: Checkout Caller Repository
         uses: actions/checkout@v4
@@ -75,19 +75,19 @@ jobs:
 
       - name: Load Inputs from YAML
         id: load-inputs
-        uses: HerodotusDev/cicd/.github/actions/load-inputs@gcp
+        uses: HerodotusDev/cicd/.github/actions/load-inputs@main
         with:
           inputs_file: ${{env.inputs_files}}
 
       - name: Extract Version
-        uses: HerodotusDev/cicd/.github/actions/extract-version@gcp
+        uses: HerodotusDev/cicd/.github/actions/extract-version@main
         id: version
         with:
           file: ${{ env.version_file }}
 
   build-and-push-image:
     needs: [define-matrix, version]
-    runs-on: gcp-arc-runners
+    runs-on: main-arc-runners
     strategy:
       matrix:
         app: ${{ fromJson(needs.define-matrix.outputs.matrix_apps) }}
@@ -101,12 +101,12 @@ jobs:
 
       - name: Load Inputs from YAML
         id: load-inputs
-        uses: HerodotusDev/cicd/.github/actions/load-inputs@gcp
+        uses: HerodotusDev/cicd/.github/actions/load-inputs@main
         with:
           inputs_file: ${{env.inputs_files}}
 
       - name: Build and push image
-        uses: HerodotusDev/cicd/.github/actions/build-and-push-image@gcp
+        uses: HerodotusDev/cicd/.github/actions/build-and-push-image@main
         env:
           dockerfile: ${{ github.repository == 'HerodotusDev/backend' && 'storage-proofs' || matrix.app }}          
         with:
@@ -119,7 +119,7 @@ jobs:
 
   create-git-tag:
     needs: [version, build-and-push-image]
-    runs-on: gcp-arc-runners 
+    runs-on: main-arc-runners 
     steps:
       - name: Checkout Caller Repository
         uses: actions/checkout@v4
@@ -130,19 +130,19 @@ jobs:
 
       - name: Load Inputs from YAML
         id: load-inputs
-        uses: HerodotusDev/cicd/.github/actions/load-inputs@gcp
+        uses: HerodotusDev/cicd/.github/actions/load-inputs@main
         with:
           inputs_file: ${{env.inputs_files}}
 
       - name: Create Git tag
-        uses: HerodotusDev/cicd/.github/actions/create-git-tag@gcp
+        uses: HerodotusDev/cicd/.github/actions/create-git-tag@main
         with:
           tag: ${{ needs.version.outputs.version }}
           token: ${{ secrets.GITHUB_TOKEN }}
 
   deploy-init-pods:
     needs: [define-matrix, version, create-git-tag, build-and-push-image]
-    runs-on: gcp-arc-runners
+    runs-on: main-arc-runners
     strategy:
       matrix:
         app: ${{ fromJson(needs.define-matrix.outputs.matrix_init) }}
@@ -158,7 +158,7 @@ jobs:
                   
       - name: Load Inputs from YAML
         id: load-inputs
-        uses: HerodotusDev/cicd/.github/actions/load-inputs@gcp
+        uses: HerodotusDev/cicd/.github/actions/load-inputs@main
         with:
           inputs_file: ./k8s/cicd-inputs.yaml          
 
@@ -168,7 +168,7 @@ jobs:
           version: "v1.32.0"
 
       - name: Build and push image
-        uses: HerodotusDev/cicd/.github/actions/build-and-push-image@gcp
+        uses: HerodotusDev/cicd/.github/actions/build-and-push-image@main
         env:
           dockerfile: ${{ github.repository == 'HerodotusDev/backend' && 'storage-proofs' || matrix.app }}          
         with:
@@ -182,7 +182,7 @@ jobs:
 
       - name: Update deployment YAML with image tag
         run: |
-          sed -i "s|<IMAGE>|${{ env.dockerhub_project }}/${{ (github.ref_name != 'gcp-main' && github.ref_name != 'main') && 'stg-' || '' }}${{ matrix.app }}:${{ needs.version.outputs.version }}|g" "./k8s/${{ env.k8s_env }}/${{ matrix.app }}-pod.yaml"
+          sed -i "s|<IMAGE>|${{ env.dockerhub_project }}/${{ (github.ref_name != 'main-main' && github.ref_name != 'main') && 'stg-' || '' }}${{ matrix.app }}:${{ needs.version.outputs.version }}|g" "./k8s/${{ env.k8s_env }}/${{ matrix.app }}-pod.yaml"
         shell: bash
           
       - name: Delete pod if it exists
@@ -218,7 +218,7 @@ jobs:
 
   deploy:
     needs: [define-matrix, version, create-git-tag, build-and-push-image, deploy-init-pods]
-    runs-on: gcp-arc-runners
+    runs-on: main-arc-runners
     strategy:
       matrix:
         app: ${{ fromJson(needs.define-matrix.outputs.matrix_apps) }}
@@ -234,13 +234,13 @@ jobs:
 
       - name: Load Inputs from YAML
         id: load-inputs
-        uses: HerodotusDev/cicd/.github/actions/load-inputs@gcp
+        uses: HerodotusDev/cicd/.github/actions/load-inputs@main
         with:
           inputs_file: ${{env.inputs_files}}
 
       - name: Ensure ConfigMap from files
         id: ensure_configmap
-        uses: HerodotusDev/cicd/.github/actions/create-configmap@gcp
+        uses: HerodotusDev/cicd/.github/actions/create-configmap@main
         with:
           namespace: ${{ env.namespace }}
           app_name: ${{ matrix.app }}
@@ -248,7 +248,7 @@ jobs:
 
       - name: Pull  config from etcd
         id: pull_config
-        uses: HerodotusDev/cicd/.github/actions/pull-etcd-config@gcp
+        uses: HerodotusDev/cicd/.github/actions/pull-etcd-config@main
         env:
           app_name: ${{ github.repository == 'HerodotusDev/backend' && 'storage-proofs' || matrix.app }}        
         with:
@@ -260,7 +260,7 @@ jobs:
           k8s_env: ${{ env.k8s_env }}
 
       - name: Deploy to Kubernetes
-        uses: HerodotusDev/cicd/.github/actions/deploy-to-k8s@gcp
+        uses: HerodotusDev/cicd/.github/actions/deploy-to-k8s@main
         with:
           namespace: ${{ env.namespace }}
           deployment_file: ./k8s/${{ env.k8s_env }}/${{ matrix.app }}-deployment.yaml
