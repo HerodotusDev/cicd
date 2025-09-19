@@ -15,7 +15,7 @@ permissions:
 jobs:
 
   define-matrix:
-    runs-on: main-arc-runners
+    runs-on: gcp-arc-runners
     outputs:
       matrix_apps: ${{ steps.define-matrix.outputs.matrix_apps }}
       matrix_init: ${{ steps.define-matrix-init.outputs.matrix_init }}      
@@ -44,7 +44,7 @@ jobs:
           echo 'matrix_init=${{ env.init_pods }}' >> "$GITHUB_OUTPUT"                    
 
   siren:
-    runs-on: main-arc-runners
+    runs-on: gcp-arc-runners
     if: false
     steps:
       - name: Log in to Docker Hub
@@ -64,7 +64,7 @@ jobs:
   version:
     outputs:
       version: ${{ steps.version.outputs.version }}
-    runs-on: main-arc-runners
+    runs-on: gcp-arc-runners
     steps:
       - name: Checkout Caller Repository
         uses: actions/checkout@v4
@@ -87,7 +87,7 @@ jobs:
 
   build-and-push-image:
     needs: [define-matrix, version]
-    runs-on: main-arc-runners
+    runs-on: gcp-arc-runners
     strategy:
       matrix:
         app: ${{ fromJson(needs.define-matrix.outputs.matrix_apps) }}
@@ -119,7 +119,7 @@ jobs:
 
   create-git-tag:
     needs: [version, build-and-push-image]
-    runs-on: main-arc-runners 
+    runs-on: gcp-arc-runners 
     steps:
       - name: Checkout Caller Repository
         uses: actions/checkout@v4
@@ -142,7 +142,7 @@ jobs:
 
   deploy-init-pods:
     needs: [define-matrix, version, create-git-tag, build-and-push-image]
-    runs-on: main-arc-runners
+    runs-on: gcp-arc-runners
     strategy:
       matrix:
         app: ${{ fromJson(needs.define-matrix.outputs.matrix_init) }}
@@ -218,7 +218,7 @@ jobs:
 
   deploy:
     needs: [define-matrix, version, create-git-tag, build-and-push-image, deploy-init-pods]
-    runs-on: main-arc-runners
+    runs-on: gcp-arc-runners
     strategy:
       matrix:
         app: ${{ fromJson(needs.define-matrix.outputs.matrix_apps) }}
