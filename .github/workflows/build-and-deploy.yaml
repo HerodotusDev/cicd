@@ -217,7 +217,7 @@ jobs:
                   
 
   deploy:
-    needs: [define-matrix, version, create-git-tag, build-and-push-image]
+    needs: [define-matrix, version, create-git-tag, build-and-push-image, deploy-init-pods]
     runs-on: gcp-arc-runners
     strategy:
       matrix:
