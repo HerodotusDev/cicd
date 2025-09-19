@@ -182,7 +182,7 @@ jobs:
 
       - name: Update deployment YAML with image tag
         run: |
-          sed -i "s|<IMAGE>|${{ env.dockerhub_project }}/${{ matrix.app }}:${{ needs.version.outputs.version }}|g" "./k8s/${{ env.k8s_env }}/${{ matrix.app }}-pod.yaml"
+          sed -i "s|<IMAGE>|${{ env.dockerhub_project }}/${{ (github.ref_name != 'gcp-main' && github.ref_name != 'main') && 'stg-' || '' }}${{ matrix.app }}:${{ needs.version.outputs.version }}|g" "./k8s/${{ env.k8s_env }}/${{ matrix.app }}-pod.yaml"
         shell: bash
           
       - name: Delete pod if it exists
