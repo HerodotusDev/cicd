@@ -4,7 +4,7 @@ on:
   workflow_call:
 
 env:
-  rollout_timeout: 300       
+  rollout_timeout: 500       
   version_file: ./package.json  
   inputs_files: ./k8s/cicd-inputs.yaml
   dockerhub_project: dataprocessor
@@ -122,6 +122,46 @@ jobs:
           docker_password: ${{ env.ARC_DOCKER_PASSWORD }}
           dockerfile: ${{ env.dockerfile }}
 
+  build-and-push-init:
+    needs: [define-matrix, version]
+    runs-on: gcp-arc-runners
+    strategy:
+      matrix:
+        app: ${{ fromJson(needs.define-matrix.outputs.matrix_init) }}
+
+    steps:
+      - name: Skip init pod build
+        if: ${{ matrix.app == '__no_init__' }}
+        run: echo "No init pods requested. Skipping build-and-push-init job."
+
+      - name: Checkout Caller Repository
+        if: ${{ matrix.app != '__no_init__' }}
+        uses: actions/checkout@v4
+        with:
+          repository: ${{ github.repository }}
+          ref: ${{ github.ref }}
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Load Inputs from YAML
+        id: load-init-inputs
+        if: ${{ matrix.app != '__no_init__' }}
+        uses: HerodotusDev/cicd/.github/actions/load-inputs@main
+        with:
+          inputs_file: ${{ env.inputs_files }}
+
+      - name: Build and push init image
+        if: ${{ matrix.app != '__no_init__' }}
+        uses: HerodotusDev/cicd/.github/actions/build-and-push-image@main
+        env:
+          dockerfile: ${{ github.repository == 'HerodotusDev/backend' && 'storage-proofs' || matrix.app }}
+        with:
+          dockerhub_project: ${{ env.dockerhub_project }}
+          app_name: ${{ matrix.app }}
+          version: ${{ needs.version.outputs.version }}
+          docker_username: ${{ env.ARC_DOCKER_USERNAME }}
+          docker_password: ${{ env.ARC_DOCKER_PASSWORD }}
+          dockerfile: ${{ env.dockerfile }}
+
   create-git-tag:
     needs: [version, build-and-push-image]
     runs-on: gcp-arc-runners 
@@ -146,7 +186,7 @@ jobs:
           token: ${{ secrets.GITHUB_TOKEN }}
 
   deploy-init-pods:
-    needs: [define-matrix, version, create-git-tag, build-and-push-image]
+    needs: [define-matrix, version, create-git-tag, build-and-push-image, build-and-push-init]
     runs-on: gcp-arc-runners
     strategy:
       matrix:
@@ -170,21 +210,7 @@ jobs:
         if: ${{ matrix.app != '__no_init__' }}
         uses: HerodotusDev/cicd/.github/actions/load-inputs@main
         with:
-          inputs_file: ./k8s/cicd-inputs.yaml          
-
-      - name: Build and push image
-        if: ${{ matrix.app != '__no_init__' }}
-        uses: HerodotusDev/cicd/.github/actions/build-and-push-image@main
-        env:
-          dockerfile: ${{ github.repository == 'HerodotusDev/backend' && 'storage-proofs' || matrix.app }}          
-        with:
-          dockerhub_project: ${{ env.dockerhub_project }}
-          app_name: ${{ matrix.app }}
-          version: ${{ needs.version.outputs.version }}
-          docker_username: ${{ env.ARC_DOCKER_USERNAME }}
-          docker_password: ${{ env.ARC_DOCKER_PASSWORD }}
-          dockerfile: ${{ env.dockerfile }}
-    
+          inputs_file: ${{ env.inputs_files }}          
 
       - name: Deploy init pod
         if: ${{ matrix.app != '__no_init__' }}
