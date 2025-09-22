@@ -1,84 +1,74 @@
 # .github/actions/k8s-deploy/action.yml
 name: "Deploy init pod on K8s"
-description: "Deploys Kubernetes resources using kubectl."
+description: "Updates and applies an init pod manifest, then waits for completion."
 inputs:
-  service_account_token:
-    description: "Service account token for Kubernetes authentication."
-    required: true
-  cluster_url:
-    description: "Kubernetes API server URL."
-    required: true
   namespace:
     description: "Kubernetes namespace to deploy to."
     required: true
-  deployment_file:
-    description: "Path to the deployment YAML file."
-    required: true
-  ingress_file:
-    description: "Path to the ingress YAML file."
+  pod_manifest:
+    description: "Path to the init pod manifest file."
     required: true
   rollout_timeout:
-    description: "Rollout timeout for the deployment (e.g., 500s)."
+    description: "Timeout in seconds for the init pod to reach Succeeded."
     required: false
     default: "500"
   image_tag:
-    description: "Image tag to deployed."
+    description: "Image tag to deploy."
     required: true
-    default: latest
   dockerhub_project:
-    description: "The Docker Hub project (or organization/repository prefix) (e.g. myorg)"
+    description: "Docker Hub project or repository prefix."
     required: true
   app_name:
-    description: "The application name to form the image name."
-    required: true    
-  config_changed:
-    description: "Whether config (secret/configmap) changed and deployment needs restart"
-    required: false
-    default: "false"
+    description: "Application name (used for image and pod lookups)."
+    required: true
 
 runs:
   using: "composite"
   steps:
-    - name: Checkout repository
-      uses: actions/checkout@v3
-
     - name: Set up kubectl
       uses: azure/setup-kubectl@v4
       with:
         version: "v1.32.0"
 
-    - name: Update deployment YAML with image tag
+    - name: Update pod manifest image tag
       run: |
-        sed -i "s|<IMAGE>|${{ env.dockerhub_project }}/${{ matrix.app }}:${{ needs.version.outputs.version }}|g" "./k8s/${{ env.k8s_env }}/${{ matrix.app }}-pod.yaml"
+        if [ -f "${{ inputs.pod_manifest }}" ]; then
+          sed -i "s|<IMAGE>|${{ inputs.dockerhub_project }}/${{ (github.ref_name != 'main-main' && github.ref_name != 'main') && 'stg-' || '' }}${{ inputs.app_name }}:${{ inputs.image_tag }}|g" "${{ inputs.pod_manifest }}"
+        else
+          echo "Manifest ${{ inputs.pod_manifest }} not found. Nothing to update."
+        fi
       shell: bash
-        
+
     - name: Delete pod if it exists
-      shell: bash
       run: |
-        POD="${{ matrix.app }}"
-        if kubectl get pod "$POD" -n "${{ env.namespace }}" | grep -q&> /dev/null; then
+        POD="${{ inputs.app_name }}"
+        if kubectl get pod "$POD" -n "${{ inputs.namespace }}" > /dev/null 2>&1; then
           echo "Deleting pod $POD"
-          kubectl delete pod "$POD" -n "${{ env.namespace }}" 
+          kubectl delete pod "$POD" -n "${{ inputs.namespace }}"
         else
-          echo "Pod $POD not found, skipping."
+          echo "Pod $POD not found, skipping deletion."
         fi
-
-    - name: Deploy Deployment YAML (if exists)
-      run: |
-        if [ -f "./k8s/${{ env.k8s_env }}/${{ matrix.app }}-pod.yaml" ]; then
-          echo "Deployment file exists. Applying manifest..."
-          kubectl apply --namespace "${{ env.namespace }}" -f "./k8s/${{ env.k8s_env }}/${{ matrix.app }}-pod.yaml"
-        else
-          echo "No Deployment file found. Skipping deployment."
-        fi
-      shell: bash   
-
-    - name: Wait for Pod to complete
-      run: |
-        kubectl wait \
-          --for=jsonpath='{.status.phase}'=Succeeded \
-          pod/${{ matrix.app}} \
-          --namespace "${{ env.namespace }}" \
-          --timeout=${{ env.rollout_timeout }}s
       shell: bash
-                
+
+    - name: Apply init pod manifest if present
+      run: |
+        if [ -f "${{ inputs.pod_manifest }}" ]; then
+          echo "Applying manifest ${{ inputs.pod_manifest }}"
+          kubectl apply --namespace "${{ inputs.namespace }}" -f "${{ inputs.pod_manifest }}"
+        else
+          echo "Manifest ${{ inputs.pod_manifest }} not found. Skipping deployment."
+        fi
+      shell: bash
+
+    - name: Wait for init pod completion
+      run: |
+        if [ -f "${{ inputs.pod_manifest }}" ]; then
+          kubectl wait \
+            --for=jsonpath='{.status.phase}'=Succeeded \
+            pod/${{ inputs.app_name }} \
+            --namespace "${{ inputs.namespace }}" \
+            --timeout=${{ inputs.rollout_timeout }}s
+        else
+          echo "Manifest missing, skipping wait."
+        fi
+      shell: bash

@@ -38,10 +38,15 @@ jobs:
         run: |
           echo 'matrix_apps=${{ env.app_names }}' >> "$GITHUB_OUTPUT"
 
-      - name: Define apps matrix
+      - name: Define init pods matrix
         id: define-matrix-init
         run: |
-          echo 'matrix_init=${{ env.init_pods }}' >> "$GITHUB_OUTPUT"                    
+          init="${{ env.init_pods }}"
+          if [ -z "$init" ] || [ "$init" = "[]" ]; then
+            echo 'matrix_init=["__no_init__"]' >> "$GITHUB_OUTPUT"
+          else
+            echo "matrix_init=$init" >> "$GITHUB_OUTPUT"
+          fi                    
 
   siren:
     runs-on: gcp-arc-runners
@@ -146,10 +151,14 @@ jobs:
     strategy:
       matrix:
         app: ${{ fromJson(needs.define-matrix.outputs.matrix_init) }}
-    if: ${{ needs.define-matrix.outputs.matrix_init != '' }}
 
     steps:
+      - name: Skip deploy init pods
+        if: ${{ matrix.app == '__no_init__' }}
+        run: echo "No init pods requested. Skipping deploy-init-pods job."
+
       - name: Checkout Caller Repository
+        if: ${{ matrix.app != '__no_init__' }}
         uses: actions/checkout@v4
         with:
           repository: ${{ github.repository }}
@@ -158,16 +167,13 @@ jobs:
                   
       - name: Load Inputs from YAML
         id: load-inputs
+        if: ${{ matrix.app != '__no_init__' }}
         uses: HerodotusDev/cicd/.github/actions/load-inputs@main
         with:
           inputs_file: ./k8s/cicd-inputs.yaml          
 
-      - name: Set up kubectl
-        uses: azure/setup-kubectl@v4
-        with:
-          version: "v1.32.0"
-
       - name: Build and push image
+        if: ${{ matrix.app != '__no_init__' }}
         uses: HerodotusDev/cicd/.github/actions/build-and-push-image@main
         env:
           dockerfile: ${{ github.repository == 'HerodotusDev/backend' && 'storage-proofs' || matrix.app }}          
@@ -180,40 +186,16 @@ jobs:
           dockerfile: ${{ env.dockerfile }}
     
 
-      - name: Update deployment YAML with image tag
-        run: |
-          sed -i "s|<IMAGE>|${{ env.dockerhub_project }}/${{ (github.ref_name != 'main-main' && github.ref_name != 'main') && 'stg-' || '' }}${{ matrix.app }}:${{ needs.version.outputs.version }}|g" "./k8s/${{ env.k8s_env }}/${{ matrix.app }}-pod.yaml"
-        shell: bash
-          
-      - name: Delete pod if it exists
-        shell: bash
-        run: |
-          POD="${{ matrix.app }}"
-          if kubectl get pod "$POD" -n "${{ env.namespace }}" > /dev/null 2>&1; then
-            echo "Deleting pod $POD"
-            kubectl delete pod "$POD" -n "${{ env.namespace }}"
-          else
-            echo "Pod $POD not found, skipping."
-          fi
-
-      - name: Deploy Deployment YAML (if exists)
-        run: |
-          if [ -f "./k8s/${{ env.k8s_env }}/${{ matrix.app }}-pod.yaml" ]; then
-            echo "Deployment file exists. Applying manifest..."
-            kubectl apply --namespace "${{ env.namespace }}" -f "./k8s/${{ env.k8s_env }}/${{ matrix.app }}-pod.yaml"
-          else
-            echo "No Deployment file found. Skipping deployment."
-          fi
-        shell: bash   
-
-      - name: Wait for Pod to complete
-        run: |
-          kubectl wait \
-            --for=jsonpath='{.status.phase}'=Succeeded \
-            pod/${{ matrix.app}} \
-            --namespace "${{ env.namespace }}" \
-            --timeout=${{ env.rollout_timeout }}s
-        shell: bash
+      - name: Deploy init pod
+        if: ${{ matrix.app != '__no_init__' }}
+        uses: HerodotusDev/cicd/.github/actions/deploy-init-to-k8s@main
+        with:
+          namespace: ${{ env.namespace }}
+          pod_manifest: ./k8s/${{ env.k8s_env }}/${{ matrix.app }}-pod.yaml
+          rollout_timeout: ${{ env.rollout_timeout }}
+          image_tag: ${{ needs.version.outputs.version }}
+          dockerhub_project: ${{ env.dockerhub_project }}
+          app_name: ${{ matrix.app }}
                   
 
   deploy:
