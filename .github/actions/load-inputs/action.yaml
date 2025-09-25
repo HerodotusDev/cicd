@@ -1,5 +1,5 @@
 name: "Load Inputs as Environment Variables"
-description: "Reads a YAML file and sets all key-value pairs as environment variables directly."
+description: "Reads a YAML file and sets key-value pairs as environment variables; emits normalized app metadata."
 
 inputs:
   inputs_file:
@@ -10,66 +10,41 @@ inputs:
 outputs:
   app_names:
     description: "The app_names value from the inputs file"
-    value: ${{ steps.load-inputs.outputs.app_names }}
+    value: ${{ steps.parse-inputs.outputs.app_names }}
+  app_matrix:
+    description: "Normalized app metadata derived from app_names"
+    value: ${{ steps.parse-inputs.outputs.app_matrix }}
 
 runs:
   using: "composite"
   steps:
     - name: Load Inputs and Set Environment Variables
-      id: load-inputs
+      id: parse-inputs
+      shell: bash
+      env:
+        INPUTS_FILE: ${{ inputs.inputs_file }}
       run: |
-        if [ ! -f "${{ inputs.inputs_file }}" ]; then
-          echo "❌ Error: File ${{ inputs.inputs_file }} not found!"
+        set -euo pipefail
+
+        if [ ! -f "$INPUTS_FILE" ]; then
+          echo "❌ Error: File $INPUTS_FILE not found!"
           exit 1
         fi
 
-        echo "✅ Reading input variables..."
-        
-        # Read the file line by line and set environment variables
-        while IFS= read -r line || [ -n "$line" ]; do  # Added -n "$line" to catch the last line
-          # Skip empty lines and full-line comments
-          if [[ -z "$line" || "$line" =~ ^[[:space:]]*# ]]; then
-            continue
-          fi
-          
-          # Remove inline comments and trim
-          original_line="$line"
-          line="${line%%#*}"
-          line="$(echo "$line" | sed -e 's/^[[:space:]]*//' -e 's/[[:space:]]*$//')"
-          
-          # Extract key and value using improved pattern matching
-          if [[ "$line" =~ ^([^:]+)[[:space:]]*:[[:space:]]*(.+)$ ]]; then
-            key="$(echo "${BASH_REMATCH[1]}" | sed -e 's/^[[:space:]]*//' -e 's/[[:space:]]*$//')"
-            value="$(echo "${BASH_REMATCH[2]}" | sed -e 's/^[[:space:]]*//' -e 's/[[:space:]]*$//')"
-            
-            # Remove quotes if present
-            value="${value%\"}"
-            value="${value#\"}"
-            
-            # Set the environment variable
-            echo "$key=$value" >> "$GITHUB_ENV"
-            echo "Set $key=$value"
-
-          else
-            echo "⚠️ Warning: Could not parse line: '$original_line'"
-          fi
-        done < "${{ inputs.inputs_file }}"
-        
-        echo "✅ All variables loaded successfully"
-      shell: bash
-
+        python3 "${GITHUB_ACTION_PATH}/load_inputs.py" \
+          --inputs-file "$INPUTS_FILE" \
+          --env "$GITHUB_ENV" \
+          --output "$GITHUB_OUTPUT"
     - name: Overwrite envs
+      shell: bash
       run: |
         if [ "${GITHUB_REF_NAME}" = "gcp-develop" ] || [ "${GITHUB_REF_NAME}" = "develop" ]; then
           echo "namespace=stg-${{env.namespace}}" >> $GITHUB_ENV
-          echo "k8s_env=stg" >> $GITHUB_ENV;
+          echo "k8s_env=stg" >> $GITHUB_ENV
         elif [ "${GITHUB_REF_NAME}" = "gcp-main" ] || [ "${GITHUB_REF_NAME}" = "main" ]; then
           echo "namespace=prod-${namespace}" >> $GITHUB_ENV
-          echo "k8s_env=prod" >> $GITHUB_ENV;
+          echo "k8s_env=prod" >> $GITHUB_ENV
         fi
-        
+
         repo_name=$(basename "$GITHUB_REPOSITORY")
         echo "repo_name=$repo_name" >> $GITHUB_ENV
-
-      shell: bash
-

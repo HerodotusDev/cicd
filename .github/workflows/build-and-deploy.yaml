@@ -4,72 +4,25 @@ on:
   workflow_call:
 
 env:
-  rollout_timeout: 500       
-  version_file: ./package.json  
+  rollout_timeout: 500
+  version_file: ./package.json
+  version_key:
   inputs_files: ./k8s/cicd-inputs.yaml
   dockerhub_project: dataprocessor
-  
+
 permissions:
   contents: write
 
 jobs:
-
   define-matrix:
     runs-on: gcp-arc-runners
     outputs:
-      matrix_apps: ${{ steps.define-matrix.outputs.matrix_apps }}
-      matrix_init: ${{ steps.define-matrix-init.outputs.matrix_init }}      
-    steps:
-      - name: Checkout Caller Repository
-        uses: actions/checkout@v4
-        with:
-          repository: ${{ github.repository }}
-          ref: ${{ github.ref }}
-          token: ${{ secrets.GITHUB_TOKEN }}
-
-      - name: Load App Names
-        id: load-app-names
-        uses: HerodotusDev/cicd/.github/actions/load-inputs@main
-        with:
-          inputs_file: ${{env.inputs_files}}
-
-      - name: Define apps matrix
-        id: define-matrix
-        run: |
-          echo 'matrix_apps=${{ env.app_names }}' >> "$GITHUB_OUTPUT"
-
-      - name: Define init pods matrix
-        id: define-matrix-init
-        run: |
-          init="${{ env.init_pods }}"
-          if [ -z "$init" ] || [ "$init" = "[]" ]; then
-            echo 'matrix_init=["__no_init__"]' >> "$GITHUB_OUTPUT"
-          else
-            echo "matrix_init=$init" >> "$GITHUB_OUTPUT"
-          fi                    
-
-  siren:
-    runs-on: gcp-arc-runners
-    if: false
-    steps:
-      - name: Log in to Docker Hub
-        uses: docker/login-action@v2
-        with:
-          username: ${{ env.ARC_DOCKER_USERNAME }}
-          password: ${{ env.ARC_DOCKER_PASSWORD }}
-
-      - name: Pull Siren Image from Registry
-        run: docker pull ${{ inputs.siren_image }}
-
-      - name: Run Siren Check
-        run: |
-          docker run --rm ${{ inputs.siren_image }} || exit 1
-        shell: bash
-
-  version:
-    outputs:
-      version: ${{ steps.version.outputs.version }}
-    runs-on: gcp-arc-runners
+      matrix_apps: ${{ steps.build-matrix.outputs.matrix_apps }}
+      matrix_init: ${{ steps.build-matrix.outputs.matrix_init }}
+      app_versions: ${{ steps.build-matrix.outputs.app_versions }}
+      primary_version: ${{ steps.build-matrix.outputs.primary_version }}
+      unique_versions: ${{ steps.build-matrix.outputs.unique_versions }}
+      should_tag: ${{ steps.build-matrix.outputs.should_tag }}
     steps:
       - name: Checkout Caller Repository
         uses: actions/checkout@v4
@@ -82,16 +35,20 @@ jobs:
         id: load-inputs
         uses: HerodotusDev/cicd/.github/actions/load-inputs@main
         with:
-          inputs_file: ${{env.inputs_files}}
+          inputs_file: ${{ env.inputs_files }}
 
-      - name: Extract Version
-        uses: HerodotusDev/cicd/.github/actions/extract-version@main
-        id: version
+      - name: Build app matrix metadata
+        id: build-matrix
+        uses: HerodotusDev/cicd/.github/actions/build-matrix@main
         with:
-          file: ${{ env.version_file }}
+          app_matrix: ${{ steps.load-inputs.outputs.app_matrix }}
+          app_names: ${{ steps.load-inputs.outputs.app_names }}
+          init_pods: ${{ env.init_pods }}
+          default_version_file: ${{ env.version_file }}
+          default_version_key: ${{ env.version_key }}
 
   build-and-push-image:
-    needs: [define-matrix, version]
+    needs: [define-matrix]
     runs-on: gcp-arc-runners
     strategy:
       matrix:
@@ -108,27 +65,25 @@ jobs:
         id: load-inputs
         uses: HerodotusDev/cicd/.github/actions/load-inputs@main
         with:
-          inputs_file: ${{env.inputs_files}}
+          inputs_file: ${{ env.inputs_files }}
 
       - name: Build and push image
         uses: HerodotusDev/cicd/.github/actions/build-and-push-image@main
-        env:
-          dockerfile: ${{ github.repository == 'HerodotusDev/backend' && 'storage-proofs' || matrix.app }}          
         with:
           dockerhub_project: ${{ env.dockerhub_project }}
-          app_name: ${{ matrix.app }}
-          version: ${{ needs.version.outputs.version }}
+          app_name: ${{ matrix.app.name }}
+          version: ${{ fromJson(needs.define-matrix.outputs.app_versions)[matrix.app.name] }}
           docker_username: ${{ env.ARC_DOCKER_USERNAME }}
           docker_password: ${{ env.ARC_DOCKER_PASSWORD }}
-          dockerfile: ${{ env.dockerfile }}
+          dockerfile: ${{ github.repository == 'HerodotusDev/backend' && 'storage-proofs' || matrix.app.dockerfile }}
+          context: ${{ matrix.app.context }}
 
   build-and-push-init:
-    needs: [define-matrix, version]
+    needs: [define-matrix]
     runs-on: gcp-arc-runners
     strategy:
       matrix:
         app: ${{ fromJson(needs.define-matrix.outputs.matrix_init) }}
-
     steps:
       - name: Skip init pod build
         if: ${{ matrix.app == '__no_init__' }}
@@ -152,19 +107,18 @@ jobs:
       - name: Build and push init image
         if: ${{ matrix.app != '__no_init__' }}
         uses: HerodotusDev/cicd/.github/actions/build-and-push-image@main
-        env:
-          dockerfile: ${{ github.repository == 'HerodotusDev/backend' && 'storage-proofs' || matrix.app }}
         with:
           dockerhub_project: ${{ env.dockerhub_project }}
           app_name: ${{ matrix.app }}
-          version: ${{ needs.version.outputs.version }}
+          version: ${{ needs.define-matrix.outputs.primary_version }}
           docker_username: ${{ env.ARC_DOCKER_USERNAME }}
           docker_password: ${{ env.ARC_DOCKER_PASSWORD }}
-          dockerfile: ${{ env.dockerfile }}
+          dockerfile: ${{ github.repository == 'HerodotusDev/backend' && 'storage-proofs' || matrix.app }}
 
   create-git-tag:
-    needs: [version, build-and-push-image]
-    runs-on: gcp-arc-runners 
+    needs: [define-matrix, build-and-push-image]
+    if: ${{ needs.define-matrix.outputs.should_tag == 'true' }}
+    runs-on: gcp-arc-runners
     steps:
       - name: Checkout Caller Repository
         uses: actions/checkout@v4
@@ -177,21 +131,20 @@ jobs:
         id: load-inputs
         uses: HerodotusDev/cicd/.github/actions/load-inputs@main
         with:
-          inputs_file: ${{env.inputs_files}}
+          inputs_file: ${{ env.inputs_files }}
 
       - name: Create Git tag
         uses: HerodotusDev/cicd/.github/actions/create-git-tag@main
         with:
-          tag: ${{ needs.version.outputs.version }}
+          tag: ${{ needs.define-matrix.outputs.primary_version }}
           token: ${{ secrets.GITHUB_TOKEN }}
 
   deploy-init-pods:
-    needs: [define-matrix, version, create-git-tag, build-and-push-image, build-and-push-init]
+    needs: [define-matrix, create-git-tag, build-and-push-image, build-and-push-init]
     runs-on: gcp-arc-runners
     strategy:
       matrix:
         app: ${{ fromJson(needs.define-matrix.outputs.matrix_init) }}
-
     steps:
       - name: Skip deploy init pods
         if: ${{ matrix.app == '__no_init__' }}
@@ -203,14 +156,14 @@ jobs:
         with:
           repository: ${{ github.repository }}
           ref: ${{ github.ref }}
-          token: ${{ secrets.GITHUB_TOKEN }}  
-                  
+          token: ${{ secrets.GITHUB_TOKEN }}
+
       - name: Load Inputs from YAML
         id: load-inputs
         if: ${{ matrix.app != '__no_init__' }}
         uses: HerodotusDev/cicd/.github/actions/load-inputs@main
         with:
-          inputs_file: ${{ env.inputs_files }}          
+          inputs_file: ${{ env.inputs_files }}
 
       - name: Deploy init pod
         if: ${{ matrix.app != '__no_init__' }}
@@ -219,19 +172,18 @@ jobs:
           namespace: ${{ env.namespace }}
           pod_manifest: ./k8s/${{ env.k8s_env }}/${{ matrix.app }}-pod.yaml
           rollout_timeout: ${{ env.rollout_timeout }}
-          image_tag: ${{ needs.version.outputs.version }}
+          image_tag: ${{ needs.define-matrix.outputs.primary_version }}
           dockerhub_project: ${{ env.dockerhub_project }}
           app_name: ${{ matrix.app }}
-                  
 
   deploy:
-    needs: [define-matrix, version, create-git-tag, build-and-push-image, deploy-init-pods]
+    needs: [define-matrix, create-git-tag, build-and-push-image, deploy-init-pods]
     runs-on: gcp-arc-runners
     strategy:
       matrix:
         app: ${{ fromJson(needs.define-matrix.outputs.matrix_apps) }}
     outputs:
-      config_changed: ${{ steps.pull_config.outputs.config_changed || steps.ensure_configmap.outputs.config_changed }}
+      config_changed: ${{ steps.pull_config.outputs.config_changed == 'true' || steps.ensure_configmap.outputs.config_changed == 'true' }}
     steps:
       - name: Checkout Caller Repository
         uses: actions/checkout@v4
@@ -244,26 +196,24 @@ jobs:
         id: load-inputs
         uses: HerodotusDev/cicd/.github/actions/load-inputs@main
         with:
-          inputs_file: ${{env.inputs_files}}
+          inputs_file: ${{ env.inputs_files }}
 
       - name: Ensure ConfigMap from files
         id: ensure_configmap
         uses: HerodotusDev/cicd/.github/actions/create-configmap@main
         with:
           namespace: ${{ env.namespace }}
-          app_name: ${{ matrix.app }}
+          app_name: ${{ matrix.app.name }}
           k8s_env: ${{ env.k8s_env }}
 
       - name: Pull  config from etcd
         id: pull_config
         uses: HerodotusDev/cicd/.github/actions/pull-etcd-config@main
-        env:
-          app_name: ${{ github.repository == 'HerodotusDev/backend' && 'storage-proofs' || matrix.app }}        
         with:
           namespace: ${{ env.namespace }}
-          app_name: ${{ env.app_name }}
+          app_name: ${{ matrix.app.etcd_name }}
           etcd_user: ${{ env.ARC_ETCD_USER }}
-          etcd_password: ${{ env.ARC_ETCD_PASSWORD }}          
+          etcd_password: ${{ env.ARC_ETCD_PASSWORD }}
           etcd_root: ${{ env.etcd_root || env.repo_name }}
           k8s_env: ${{ env.k8s_env }}
 
@@ -271,10 +221,10 @@ jobs:
         uses: HerodotusDev/cicd/.github/actions/deploy-to-k8s@main
         with:
           namespace: ${{ env.namespace }}
-          deployment_file: ./k8s/${{ env.k8s_env }}/${{ matrix.app }}-deployment.yaml
-          ingress_file: ./k8s/${{ env.k8s_env }}/${{ matrix.app }}-ingress.yaml
+          deployment_file: ./k8s/${{ env.k8s_env }}/${{ matrix.app.manifest_name }}-deployment.yaml
+          ingress_file: ./k8s/${{ env.k8s_env }}/${{ matrix.app.manifest_name }}-ingress.yaml
           rollout_timeout: ${{ env.rollout_timeout }}
-          image_tag: ${{ needs.version.outputs.version }}
+          image_tag: ${{ fromJson(needs.define-matrix.outputs.app_versions)[matrix.app.name] }}
           dockerhub_project: ${{ env.dockerhub_project }}
-          app_name: ${{ matrix.app }}
+          app_name: ${{ matrix.app.name }}
           config_changed: ${{ steps.pull_config.outputs.config_changed == 'true' || steps.ensure_configmap.outputs.config_changed == 'true' }}

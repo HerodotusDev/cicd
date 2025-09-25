@@ -103,6 +103,21 @@ or in case of single app
 app_names: ["example1"]
 ```
 
+Each item in `app_names` may be either a string (legacy behaviour) or a mapping with per-app overrides:
+
+```yaml
+app_names:
+  - name: example-service
+    version_file: ./services/example/Cargo.toml
+    version_key: package.version          # optional, defaults to first version entry
+    dockerfile: example-runtime           # optional, maps to docker/Dockerfile.example-runtime
+    context: ./services/example           # optional build context
+    etcd_name: example                    # optional override for etcd secret name
+    manifest_name: example-service        # optional override for manifest file prefix
+```
+
+If an override is omitted, the workflow falls back to the top-level values (`version_file`, default dockerfile equals the app name, and build context defaults to `.`).
+
 Manifest files have to named in convention of app_name-object.yaml  e.g.
 
 ```yaml

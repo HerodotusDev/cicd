@@ -1,4 +1,10 @@
 namespace: example                                # namespace to be deploy  
-app_names: ["example","example2"]                 # list of app names to deploy, can be single or multiple
+app_names:
+  - name: example                                 # app identifier used across manifests
+    version_file: ./package.json                  # file used to extract version for this app
+    dockerfile: example                           # optional, defaults to app name
+  - name: example2
+    version_file: ./services/example2/package.json
+    dockerfile: example2
 init_pods: ["init-example"]
 dockerhub_project: dataprocessor                  # name of the dockerhub project the image will be pushed to / pulled from

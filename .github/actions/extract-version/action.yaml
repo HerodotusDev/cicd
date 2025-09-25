@@ -1,61 +1,41 @@
 name: "Extract Version"
-description: "Extracts the version from a specified file using yq."
+description: "Extracts a version value from a specified JSON or TOML file."
 
 inputs:
   file:
     description: "The file containing the version."
-    required: false 
+    required: true
+  key:
+    description: "Optional dot-delimited path to the desired version entry."
+    required: false
 
 outputs:
   version:
     description: "The extracted version."
-    value: ${{ steps.extract_version.outputs.version }}
+    value: ${{ steps.extract.outputs.version }}
 
 runs:
   using: "composite"
   steps:
     - name: Extract Version
-      id: extract_version
+      id: extract
       shell: bash
+      env:
+        VERSION_FILE: ${{ inputs.file }}
+        VERSION_KEY: ${{ inputs.key }}
       run: |
-        FILE="${{ inputs.file }}"
-
-        if [ ! -f "$FILE" ]; then
-          echo "File not found: $FILE"
+        set -euo pipefail
+        script_path="${GITHUB_ACTION_PATH}/extract_version.py"
+        if [ ! -f "$VERSION_FILE" ]; then
+          echo "File not found: $VERSION_FILE"
           exit 1
         fi
 
-        case "$FILE" in
-          *.toml) TOOL="toml" ;;
-          *.json) TOOL="jq" ;;
-          *)
-            echo "Unsupported file type: $FILE"
-            exit 1
-            ;;
-        esac
-
-        # Install jq if missing (needed only for JSON)
-        if [ "$TOOL" = "jq" ]; then
-          if ! command -v jq &> /dev/null; then
-            sudo apt-get update && sudo apt-get install -y jq
-          fi
+        args=("--file" "$VERSION_FILE")
+        if [ -n "${VERSION_KEY:-}" ]; then
+          args+=("--key" "$VERSION_KEY")
         fi
 
-        # Extract version correctly
-        if [ "$TOOL" = "toml" ]; then
-          VERSION=$(
-            grep -E '^\s*version\s*=' "$FILE" \
-              | head -n1 \
-              | sed -E 's/^\s*version\s*=\s*"([^"]+)".*/\1/'
-          )
-        elif [ "$TOOL" = "jq" ]; then
-          VERSION=$(jq -r '.version' "$FILE")
-        fi
-
-        if [ -z "$VERSION" ]; then
-          echo "Version not found in $FILE."
-          exit 1
-        fi
-
-        # Correct way to output variables in composite action
-        echo "version=$VERSION" >> $GITHUB_OUTPUT
+        version=$(python3 "$script_path" "${args[@]}")
+        echo "version=$version" >> "$GITHUB_OUTPUT"
+        echo "Extracted version: $version"

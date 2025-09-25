@@ -1,0 +1,57 @@
+name: "Build App Matrix"
+description: "Normalizes app metadata and produces the matrices used by the build-and-deploy workflow."
+
+inputs:
+  app_matrix:
+    description: "JSON array of app metadata (preferred)."
+    required: false
+  app_names:
+    description: "JSON array of app names (legacy string list)."
+    required: false
+  init_pods:
+    description: "JSON array of init pods."
+    required: false
+  default_version_file:
+    description: "Fallback version file path applied when an app does not override it."
+    required: false
+    default: ./package.json
+  default_version_key:
+    description: "Optional dot-path to a nested version field."
+    required: false
+    default: ""
+
+outputs:
+  matrix_apps:
+    description: "Normalized applications matrix."
+    value: ${{ steps.generate.outputs.matrix_apps }}
+  matrix_init:
+    description: "Init pods matrix."
+    value: ${{ steps.generate.outputs.matrix_init }}
+  app_versions:
+    description: "Map of app name to resolved version."
+    value: ${{ steps.generate.outputs.app_versions }}
+  unique_versions:
+    description: "Sorted list of unique versions across apps."
+    value: ${{ steps.generate.outputs.unique_versions }}
+  primary_version:
+    description: "Version used for tagging and init pods."
+    value: ${{ steps.generate.outputs.primary_version }}
+  should_tag:
+    description: "Whether all apps share a version (controls git tagging)."
+    value: ${{ steps.generate.outputs.should_tag }}
+
+runs:
+  using: "composite"
+  steps:
+    - id: generate
+      name: Compute matrices
+      shell: bash
+      env:
+        APP_MATRIX: ${{ inputs.app_matrix }}
+        RAW_APP_NAMES: ${{ inputs.app_names }}
+        INIT_PODS: ${{ inputs.init_pods }}
+        DEFAULT_VERSION_FILE: ${{ inputs.default_version_file }}
+        DEFAULT_VERSION_KEY: ${{ inputs.default_version_key }}
+      run: |
+        set -euo pipefail
+        python3 "${GITHUB_ACTION_PATH}/build_matrix.py"
