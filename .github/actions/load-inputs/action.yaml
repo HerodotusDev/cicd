@@ -31,10 +31,7 @@ runs:
           exit 1
         fi
 
-        python3 "${GITHUB_ACTION_PATH}/load_inputs.py" \
-          --inputs-file "$INPUTS_FILE" \
-          --env "$GITHUB_ENV" \
-          --output "$GITHUB_OUTPUT"
+        bash "${GITHUB_ACTION_PATH}/load_inputs.sh" "$INPUTS_FILE" "$GITHUB_ENV" "$GITHUB_OUTPUT"
     - name: Overwrite envs
       shell: bash
       run: |

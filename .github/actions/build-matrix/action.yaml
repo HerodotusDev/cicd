@@ -54,4 +54,4 @@ runs:
         DEFAULT_VERSION_KEY: ${{ inputs.default_version_key }}
       run: |
         set -euo pipefail
-        python3 "${GITHUB_ACTION_PATH}/build_matrix.py"
+        bash "${GITHUB_ACTION_PATH}/build_matrix.sh"
