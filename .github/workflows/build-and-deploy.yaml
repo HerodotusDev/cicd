@@ -33,13 +33,13 @@ jobs:
 
       - name: Load Inputs from YAML
         id: load-inputs
-        uses: HerodotusDev/cicd/.github/actions/load-inputs@main
+        uses: HerodotusDev/cicd/.github/actions/load-inputs@multi_version
         with:
           inputs_file: ${{ env.inputs_files }}
 
       - name: Build app matrix metadata
         id: build-matrix
-        uses: HerodotusDev/cicd/.github/actions/build-matrix@main
+        uses: HerodotusDev/cicd/.github/actions/build-matrix@multi_version
         with:
           app_matrix: ${{ steps.load-inputs.outputs.app_matrix }}
           app_names: ${{ steps.load-inputs.outputs.app_names }}
@@ -63,12 +63,12 @@ jobs:
 
       - name: Load Inputs from YAML
         id: load-inputs
-        uses: HerodotusDev/cicd/.github/actions/load-inputs@main
+        uses: HerodotusDev/cicd/.github/actions/load-inputs@multi_version
         with:
           inputs_file: ${{ env.inputs_files }}
 
       - name: Build and push image
-        uses: HerodotusDev/cicd/.github/actions/build-and-push-image@main
+        uses: HerodotusDev/cicd/.github/actions/build-and-push-image@multi_version
         with:
           dockerhub_project: ${{ env.dockerhub_project }}
           app_name: ${{ matrix.app.name }}
@@ -100,13 +100,13 @@ jobs:
       - name: Load Inputs from YAML
         id: load-init-inputs
         if: ${{ matrix.app != '__no_init__' }}
-        uses: HerodotusDev/cicd/.github/actions/load-inputs@main
+        uses: HerodotusDev/cicd/.github/actions/load-inputs@multi_version
         with:
           inputs_file: ${{ env.inputs_files }}
 
       - name: Build and push init image
         if: ${{ matrix.app != '__no_init__' }}
-        uses: HerodotusDev/cicd/.github/actions/build-and-push-image@main
+        uses: HerodotusDev/cicd/.github/actions/build-and-push-image@multi_version
         with:
           dockerhub_project: ${{ env.dockerhub_project }}
           app_name: ${{ matrix.app }}
@@ -129,12 +129,12 @@ jobs:
 
       - name: Load Inputs from YAML
         id: load-inputs
-        uses: HerodotusDev/cicd/.github/actions/load-inputs@main
+        uses: HerodotusDev/cicd/.github/actions/load-inputs@multi_version
         with:
           inputs_file: ${{ env.inputs_files }}
 
       - name: Create Git tag
-        uses: HerodotusDev/cicd/.github/actions/create-git-tag@main
+        uses: HerodotusDev/cicd/.github/actions/create-git-tag@multi_version
         with:
           tag: ${{ needs.define-matrix.outputs.primary_version }}
           token: ${{ secrets.GITHUB_TOKEN }}
@@ -161,13 +161,13 @@ jobs:
       - name: Load Inputs from YAML
         id: load-inputs
         if: ${{ matrix.app != '__no_init__' }}
-        uses: HerodotusDev/cicd/.github/actions/load-inputs@main
+        uses: HerodotusDev/cicd/.github/actions/load-inputs@multi_version
         with:
           inputs_file: ${{ env.inputs_files }}
 
       - name: Deploy init pod
         if: ${{ matrix.app != '__no_init__' }}
-        uses: HerodotusDev/cicd/.github/actions/deploy-init-to-k8s@main
+        uses: HerodotusDev/cicd/.github/actions/deploy-init-to-k8s@multi_version
         with:
           namespace: ${{ env.namespace }}
           pod_manifest: ./k8s/${{ env.k8s_env }}/${{ matrix.app }}-pod.yaml
@@ -194,13 +194,13 @@ jobs:
 
       - name: Load Inputs from YAML
         id: load-inputs
-        uses: HerodotusDev/cicd/.github/actions/load-inputs@main
+        uses: HerodotusDev/cicd/.github/actions/load-inputs@multi_version
         with:
           inputs_file: ${{ env.inputs_files }}
 
       - name: Ensure ConfigMap from files
         id: ensure_configmap
-        uses: HerodotusDev/cicd/.github/actions/create-configmap@main
+        uses: HerodotusDev/cicd/.github/actions/create-configmap@multi_version
         with:
           namespace: ${{ env.namespace }}
           app_name: ${{ matrix.app.name }}
@@ -208,7 +208,7 @@ jobs:
 
       - name: Pull  config from etcd
         id: pull_config
-        uses: HerodotusDev/cicd/.github/actions/pull-etcd-config@main
+        uses: HerodotusDev/cicd/.github/actions/pull-etcd-config@multi_version
         with:
           namespace: ${{ env.namespace }}
           app_name: ${{ matrix.app.etcd_name }}
@@ -218,7 +218,7 @@ jobs:
           k8s_env: ${{ env.k8s_env }}
 
       - name: Deploy to Kubernetes
-        uses: HerodotusDev/cicd/.github/actions/deploy-to-k8s@main
+        uses: HerodotusDev/cicd/.github/actions/deploy-to-k8s@multi_version
         with:
           namespace: ${{ env.namespace }}
           deployment_file: ./k8s/${{ env.k8s_env }}/${{ matrix.app.manifest_name }}-deployment.yaml
