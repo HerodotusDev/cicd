@@ -2,7 +2,8 @@
 set -euo pipefail
 
 workspace="${GITHUB_WORKSPACE:-.}"
-extract_script="$workspace/.github/actions/extract-version/extract_version.sh"
+action_path="${GITHUB_ACTION_PATH:-$workspace/.github/actions/build-matrix}"
+extract_script="$action_path/../extract-version/extract_version.sh"
 
 if ! command -v jq >/dev/null 2>&1; then
   echo "❌ Error: jq is required but not available." >&2
