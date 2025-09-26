@@ -25,7 +25,7 @@ runs:
         VERSION_KEY: ${{ inputs.key }}
       run: |
         set -euo pipefail
-        script_path="${GITHUB_ACTION_PATH}/extract_version.py"
+        script_path="${GITHUB_ACTION_PATH}/extract_version.sh"
         if [ ! -f "$VERSION_FILE" ]; then
           echo "File not found: $VERSION_FILE"
           exit 1
@@ -36,6 +36,6 @@ runs:
           args+=("--key" "$VERSION_KEY")
         fi
 
-        version=$(python3 "$script_path" "${args[@]}")
+        version=$("$script_path" "${args[@]}")
         echo "version=$version" >> "$GITHUB_OUTPUT"
         echo "Extracted version: $version"

@@ -2,15 +2,10 @@
 set -euo pipefail
 
 workspace="${GITHUB_WORKSPACE:-.}"
-extract_script="$workspace/.github/actions/extract-version/extract_version.py"
+extract_script="$workspace/.github/actions/extract-version/extract_version.sh"
 
 if ! command -v jq >/dev/null 2>&1; then
   echo "❌ Error: jq is required but not available." >&2
-  exit 1
-fi
-
-if ! command -v python3 >/dev/null 2>&1; then
-  echo "❌ Error: python3 is required but not available." >&2
   exit 1
 fi
 
@@ -76,12 +71,12 @@ while IFS= read -r app; do
   version_key=$(printf '%s' "$app" | jq -r '.version_key // empty')
 
   if [[ -n "$version_key" ]]; then
-    if ! version=$(python3 "$extract_script" --file "$version_path" --key "$version_key"); then
+    if ! version=$("$extract_script" --file "$version_path" --key "$version_key"); then
       echo "❌ Error: Failed to extract version for app '$name'." >&2
       exit 1
     fi
   else
-    if ! version=$(python3 "$extract_script" --file "$version_path"); then
+    if ! version=$("$extract_script" --file "$version_path"); then
       echo "❌ Error: Failed to extract version for app '$name'." >&2
       exit 1
     fi
