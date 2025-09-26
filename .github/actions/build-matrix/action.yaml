@@ -36,9 +36,6 @@ outputs:
   primary_version:
     description: "Version used for tagging and init pods."
     value: ${{ steps.generate.outputs.primary_version }}
-  should_tag:
-    description: "Whether all apps share a version (controls git tagging)."
-    value: ${{ steps.generate.outputs.should_tag }}
 
 runs:
   using: "composite"

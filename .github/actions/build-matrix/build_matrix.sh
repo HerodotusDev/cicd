@@ -114,17 +114,10 @@ else
   unique_versions='[]'
 fi
 
-if [[ $(printf '%s' "$unique_versions" | jq 'length') -eq 1 ]]; then
-  should_tag="true"
-else
-  should_tag="false"
-fi
-
 {
   echo "matrix_apps=$matrix_apps"
   echo "matrix_init=$matrix_init"
   echo "app_versions=$app_versions"
   echo "unique_versions=$unique_versions"
   echo "primary_version=$primary_version"
-  echo "should_tag=$should_tag"
 } >> "${GITHUB_OUTPUT}"

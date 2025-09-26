@@ -22,7 +22,6 @@ jobs:
       app_versions: ${{ steps.build-matrix.outputs.app_versions }}
       primary_version: ${{ steps.build-matrix.outputs.primary_version }}
       unique_versions: ${{ steps.build-matrix.outputs.unique_versions }}
-      should_tag: ${{ steps.build-matrix.outputs.should_tag }}
     steps:
       - name: Checkout Caller Repository
         uses: actions/checkout@v4
@@ -117,7 +116,6 @@ jobs:
 
   create-git-tag:
     needs: [define-matrix, build-and-push-image]
-    if: ${{ needs.define-matrix.outputs.should_tag == 'true' }}
     runs-on: gcp-arc-runners
     steps:
       - name: Checkout Caller Repository
