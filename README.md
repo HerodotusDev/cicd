@@ -1,161 +1,33 @@
+## What the pipeline delivers
+- Publishes a Docker image when the version changes.
+- Tags the repo with that version.
+- Applies Kubernetes manifests for each app.
+- Syncs configuration from etcd and configmap dir before deployment.
+- Runs init jobs (apps with `init: true`) ahead of the main rollout.
+- If configmap or secret changed, but version has not, deployment will be restarted to load changes.
+- Waits for deployment rollout.
 
-# Repository for generic cicd templates.
+## Quick setup (based on l2-indexer)
+1. Copy `.github/workflows/build-and-deploy.yaml` into your repo. Add [ci skip] to commit message to avoid triggering cicd.
+2. Copy `examples/k8s` into your repo root. Edit manifests under `k8s/<env>/` to match your services.
+3. Ensure a Dockerfile exists for every app (default path `docker/Dockerfile.<app>` unless you override `dockerfile`).
+4. Fill out `k8s/cicd-inputs.yaml`.
+5. Commit the version source files referenced in `version_file` (for example `Cargo.toml`, `package.json`).
+6. Push to `develop` for staging deployment and to `main` for production. Other branches will be blocked.
 
-## Importing workflows
+## Etcd configuration
+Upload the configuration file to etcd before the workflow runs. The workflow reads `/etcd_root/k8s_env/app_name/.env` and writes it into `<app_name>-secret`.
+The secret is mounted into the container and configuration is accessible as system envs.
 
-To import workflows, copy the [examples/workflows](./examples/workflows) directory to you repo .github dir on main branch.
+## ConfigMaps
+If you place files in `k8s/<env>/<app>-configmap/`, they will be pulled into an config map object that can be mounted into the container as files.
 
-While doing initial ci commits, include a [ci skip ] in commit message, to skip running the build-and-deploy workflow.
-  
-  
-
-Trigger conditions can be set per repo in workflow file 
-
-[ How to set triggers ](https://docs.github.com/en/actions/writing-workflows/choosing-when-your-workflow-runs/events-that-trigger-workflows)
-
-## Defining k8s env
-
-
-k8s_env variable in workflow defines which dir under k8s will be used as base for deployment.
-
-e.g.
-
-```yaml
-k8s_env: stage
-```
-will make cicd use k8s/stage dir 
-
-```yaml
-k8s_env: prod
-```
-will make cicd use k8s/prod dir 
-```yaml
-k8s_env: leftmywaller
-```
-will make cicd use k8s/letmywallet dir
-
-
-## Build and deploy 
-
-   Runs either on push to main branch, or on manual trigger.
-
-   Steps:
-
-    - extract version from package.json / cargo.toml - file specified in cicd_inputs as version_file
-    - if a docker image tagged with this version hasn't been pushed to registry, build it
-    - if a git tag with this version doesn't exist, tag the commit 
-    - deploy k8s manifests, using version read from version_file
-    - if etcd-pull is true, pull config from etcd and inject it into k8s secret, if changed restart deployment by adding checksum annotation
-
-
-   If there was a change in version, but not in manifests - job will build and run a new version.
-
-   If there was no change in version, but there was a change in manifest - job will run new manifests with the latest version.
-
-   If there was no changes in manifests, nor in version, job will do nothing.
-
-## Deploy
-
-  Runs on manual trigger and requires a docker image tag to run.
-
-  Deploys given image to k8s
-
-
-## Dockerfile
-
-To build a dockerimage a Dockerfile is needed.
-
-It has to situated in [examples/docker](./examples/docker) dir
-
-and be named in convertion of 
-
-```yaml
-Dockerfile.app_name
-```
-corresponing to app_names provided in [cicd-inputs](./examples/k8s/cicd-inputs.yaml)
-
-e.g.
-
-```yaml
-Dockerfile.example
-```
-
-in case of monorepo, multiple Dockerfiles have to be provided, corresponding to app_names e.g.
-
-```yaml
-Dockerfile.example1
-Dockerfile.example2
-```
-## Importing K8s templates
-
-To enable k8s deploy, copy the [examples/k8s](./examples/k8s) directory to you repo root dir.
-
-[cicd-inputs](./examples/k8s/cicd-inputs.yaml) file specifies variables to be passed to following pipelines and has to be set.
-
-In case of monorepo it required to specify app_name list in format:
-
-```yaml
-app_names: ["example1","example2"]
-```
-or in case of single app
-
-```yaml
-app_names: ["example1"]
-```
-
-Each item in `app_names` may be either a string (legacy behaviour) or a mapping with per-app overrides:
-
-```yaml
-app_names:
-  - name: example-service
-    version_file: ./services/example/Cargo.toml
-    version_key: package.version          # optional, defaults to first version entry
-    dockerfile: example-runtime           # optional, maps to docker/Dockerfile.example-runtime
-    context: ./services/example           # optional build context
-    etcd_name: example                    # optional override for etcd secret name
-    manifest_name: example-service        # optional override for manifest file prefix
-```
-
-If an override is omitted, the workflow falls back to the top-level values (`version_file`, default dockerfile equals the app name, and build context defaults to `.`).
-
-Manifest files have to named in convention of app_name-object.yaml  e.g.
-
-```yaml
-example-deployment.yaml
-```
-```yaml
-example-ingress.yaml
-```
-
-
-
-## Enabling etcd pull
-
-To enable pulling configuration from etcd, following line have to be added / uncommented from [cicd-inputs](./examples/k8s/cicd-inputs.yaml):
-
-The key path will be determined by namespace and app name e.g
-
-  /example_namespace/example_app/envs/example_key
-
-```yaml
-
-pull_etcd_config: true              # toggle etcd pull flag
-etcd_key: .env.stage                # key to be pulled 
-
-```
-The file to be pulled has to be in key=value format coded as yaml.
-
-[etcd key example ](./examples/etcd/.env.stage)
-
-Defined key will be pulled from etcd during workflow execution, and saved to a k8s secret named as {{ app_name }}-secret.
-
-To mount secret as envs, add / uncomment follwing lines from deployment's manifest:
-
-```yaml
-
-  envFrom:
-    - secretRef:
-        name: example-secret
-
-```
-
+## Tips
+- When deploying a new app - a namespace has to be created.
+- When deploying a new ingress - a dns entry has to created.
+- Pipeline can be trigger manualy via github ui - not only by a commit.
+- Share a Dockerfile by assigning the same `dockerfile` value to multiple entries in `app_names`.
+- Each app can use shared version source or a dedicated one, to be set in cicd_inputs.
+- If the pipeline failed, check the logs before messaging ppl :)
+- Mark init-only apps with `init: true`; they will be build and deployed before standard apps.
+  Those apps need to run to completition, else they will block the pipeline - so they have to be a job or pod, not a deployment.
