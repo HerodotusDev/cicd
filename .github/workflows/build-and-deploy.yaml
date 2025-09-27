@@ -51,7 +51,7 @@ jobs:
     runs-on: gcp-arc-runners
     strategy:
       matrix:
-        app: ${{ fromJson(needs.define-matrix.outputs.matrix_apps) }}
+        app: ${{ fromJson(needs.define-matrix.outputs.matrix_deploy) }}
     steps:
       - name: Checkout Caller Repository
         uses: actions/checkout@v4
