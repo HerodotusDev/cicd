@@ -42,7 +42,6 @@ jobs:
         with:
           app_matrix: ${{ steps.load-inputs.outputs.app_matrix }}
           app_names: ${{ steps.load-inputs.outputs.app_names }}
-          init_pods: ${{ env.init_pods }}
           default_version_file: ${{ env.version_file }}
           default_version_key: ${{ env.version_key }}
 

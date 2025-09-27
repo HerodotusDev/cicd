@@ -1,10 +1,18 @@
-namespace: example                                # namespace to be deploy  
+# Sample cicd-inputs.yaml.
+# Every key becomes an env var for the workflow; comment lines list defaults when omitted.
+
+namespace: example                  # required. loader rewrites to stg-/prod-<namespace> on develop/main branches.
+version_file: ./package.json        # optional. defaults to workflow env.version_file (./package.json).
+# version_key: package.version      # optional. defaults to first "version" field when omitted.
+# etcd_root: example                # optional. defaults to repo name when omitted.
+
 app_names:
-  - name: example                                 # app identifier used across manifests
-    version_file: ./package.json                  # file used to extract version for this app
-    dockerfile: example                           # optional, defaults to app name
-  - name: example2
-    version_file: ./services/example2/package.json
-    dockerfile: example2
-init_pods: ["init-example"]
-dockerhub_project: dataprocessor                  # name of the dockerhub project the image will be pushed to / pulled from
+  - name: example                   # required per app.
+    # version_file: ./package.json  # optional. falls back to top-level version_file.
+    # version_key: package.version  # optional. uses top-level version_key by default.
+    # dockerfile: example           # optional. defaults to app name (Dockerfile.example).
+    # init: true                    # optional. default false. when true the app runs through init jobs.
+  - "example2"                      # plain strings pick up all defaults.
+
+
+# Path to be pulled from etcd: /<etcd_root>/<k8s_env>/<etcd_name or app_name>/.env

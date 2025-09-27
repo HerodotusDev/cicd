@@ -12,7 +12,6 @@ fi
 
 app_matrix_raw="${APP_MATRIX:-}"
 raw_app_names="${RAW_APP_NAMES:-}"
-init_pods_raw="${INIT_PODS:-}"
 default_version_file="${DEFAULT_VERSION_FILE:-./package.json}"
 default_version_key="${DEFAULT_VERSION_KEY:-}"
 
@@ -100,18 +99,26 @@ done < <(printf '%s' "$sanitized" | jq -c '.[]')
 
 matrix_apps=$(jq -cs '.' "$tmp_apps")
 
-if [[ -z "$init_pods_raw" || "$init_pods_raw" == "null" || "$init_pods_raw" == "" ]]; then
-  matrix_init='["__no_init__"]'
-else
-  if ! matrix_init=$(printf '%s' "$init_pods_raw" | jq -c 'if (type=="array") and (length>0) then . else ["__no_init__"] end'); then
-    matrix_init='["__no_init__"]'
-  fi
-fi
+init_entries=()
 
 if ((${#versions_seen[@]} > 0)); then
   unique_versions=$(printf '%s\n' "${versions_seen[@]}" | sort -u | jq -R -s 'split("\n") | map(select(length>0))' | jq -c '.')
 else
   unique_versions='[]'
+fi
+
+while IFS= read -r app_json; do
+  init_flag=$(printf '%s' "$app_json" | jq -r '(.init // false) | tostring')
+  name=$(printf '%s' "$app_json" | jq -r '.name')
+  if [[ "$init_flag" == "true" ]]; then
+    init_entries+=("$name")
+  fi
+done < <(printf '%s' "$matrix_apps" | jq -c '.[]')
+
+if ((${#init_entries[@]} > 0)); then
+  matrix_init=$(printf '%s\n' "${init_entries[@]}" | jq -R -s 'split("\n") | map(select(length>0))' | jq -c '.')
+else
+  matrix_init='["__no_init__"]'
 fi
 
 {

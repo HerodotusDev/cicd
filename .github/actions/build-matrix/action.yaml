@@ -8,9 +8,6 @@ inputs:
   app_names:
     description: "JSON array of app names (legacy string list)."
     required: false
-  init_pods:
-    description: "JSON array of init pods."
-    required: false
   default_version_file:
     description: "Fallback version file path applied when an app does not override it."
     required: false
@@ -46,7 +43,6 @@ runs:
       env:
         APP_MATRIX: ${{ inputs.app_matrix }}
         RAW_APP_NAMES: ${{ inputs.app_names }}
-        INIT_PODS: ${{ inputs.init_pods }}
         DEFAULT_VERSION_FILE: ${{ inputs.default_version_file }}
         DEFAULT_VERSION_KEY: ${{ inputs.default_version_key }}
       run: |
