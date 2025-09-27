@@ -21,6 +21,9 @@ outputs:
   matrix_apps:
     description: "Normalized applications matrix."
     value: ${{ steps.generate.outputs.matrix_apps }}
+  matrix_deploy:
+    description: "Applications to deploy (init apps filtered out)."
+    value: ${{ steps.generate.outputs.matrix_deploy }}
   matrix_init:
     description: "Init pods matrix."
     value: ${{ steps.generate.outputs.matrix_init }}

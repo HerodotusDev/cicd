@@ -18,6 +18,7 @@ jobs:
     runs-on: gcp-arc-runners
     outputs:
       matrix_apps: ${{ steps.build-matrix.outputs.matrix_apps }}
+      matrix_deploy: ${{ steps.build-matrix.outputs.matrix_deploy }}
       matrix_init: ${{ steps.build-matrix.outputs.matrix_init }}
       app_versions: ${{ steps.build-matrix.outputs.app_versions }}
       primary_version: ${{ steps.build-matrix.outputs.primary_version }}
@@ -178,7 +179,7 @@ jobs:
     runs-on: gcp-arc-runners
     strategy:
       matrix:
-        app: ${{ fromJson(needs.define-matrix.outputs.matrix_apps) }}
+        app: ${{ fromJson(needs.define-matrix.outputs.matrix_deploy) }}
     outputs:
       config_changed: ${{ steps.pull_config.outputs.config_changed == 'true' || steps.ensure_configmap.outputs.config_changed == 'true' }}
     steps:

@@ -101,6 +101,16 @@ matrix_apps=$(jq -cs '.' "$tmp_apps")
 
 init_entries=()
 
+deploy_matrix=$(printf '%s' "$matrix_apps" | jq -c '[ .[] | select(((.init // false) | tostring) != "true") ]')
+
+deploy_entries_count=$(printf '%s' "$deploy_matrix" | jq 'length')
+
+if [[ "$deploy_entries_count" -eq 0 ]]; then
+  matrix_deploy='[]'
+else
+  matrix_deploy="$deploy_matrix"
+fi
+
 if ((${#versions_seen[@]} > 0)); then
   unique_versions=$(printf '%s\n' "${versions_seen[@]}" | sort -u | jq -R -s 'split("\n") | map(select(length>0))' | jq -c '.')
 else
@@ -123,6 +133,7 @@ fi
 
 {
   echo "matrix_apps=$matrix_apps"
+  echo "matrix_deploy=$matrix_deploy"
   echo "matrix_init=$matrix_init"
   echo "app_versions=$app_versions"
   echo "unique_versions=$unique_versions"

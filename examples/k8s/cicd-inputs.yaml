@@ -11,7 +11,7 @@ app_names:
     # version_file: ./package.json  # optional. falls back to top-level version_file.
     # version_key: package.version  # optional. uses top-level version_key by default.
     # dockerfile: example           # optional. defaults to app name (Dockerfile.example).
-    # init: true                    # optional. default false. when true the app runs through init jobs.
+    # init: true                    # optional. default false. when true the app only runs through init jobs (not main deploy).
   - "example2"                      # plain strings pick up all defaults.
 
 
