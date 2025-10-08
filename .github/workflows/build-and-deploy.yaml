@@ -41,7 +41,7 @@ jobs:
       - name: Define init pods matrix
         id: define-matrix-init
         run: |
-          init="${{ env.init_pods }}"
+          init='${{ env.init_pods }}'
           if [ -z "$init" ] || [ "$init" = "[]" ]; then
             echo 'matrix_init=["__no_init__"]' >> "$GITHUB_OUTPUT"
           else
