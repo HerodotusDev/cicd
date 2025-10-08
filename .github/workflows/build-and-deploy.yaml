@@ -45,7 +45,7 @@ jobs:
           if [ -z "$init" ] || [ "$init" = "[]" ]; then
             echo 'matrix_init=["__no_init__"]' >> "$GITHUB_OUTPUT"
           else
-            echo 'matrix_init=$init' >> "$GITHUB_OUTPUT"
+            echo "matrix_init=${{ env.init_pods }}" >> "$GITHUB_OUTPUT"
           fi                    
 
   siren:
