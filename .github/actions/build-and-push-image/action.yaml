@@ -75,10 +75,10 @@ runs:
     - name: Set up Docker Buildx
       uses: docker/setup-buildx-action@v3
       if: ${{ steps.check_image.outputs.image_exists == 'false' }}
-      #with:
-      #  driver: cloud
-      #  endpoint: "dataprocessor/github"
-       # install: true
+      with:
+        driver: cloud
+        endpoint: "dataprocessor/github"
+        install: true
 
     - name: Compute APP_NAME
       #if: github.repository == 'HerodotusDev/backend'
