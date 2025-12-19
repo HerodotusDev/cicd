@@ -26,7 +26,12 @@ runs:
         echo "✅ Reading input variables..."
         
         # Read the file line by line and set environment variables
-        while IFS= read -r line || [ -n "$line" ]; do  # Added -n "$line" to catch the last line
+        current_key=""
+        in_array=false
+        array_items=()
+        app_names_value=""
+        
+        while IFS= read -r line || [ -n "$line" ]; do
           # Skip empty lines and full-line comments
           if [[ -z "$line" || "$line" =~ ^[[:space:]]*# ]]; then
             continue
@@ -37,23 +42,100 @@ runs:
           line="${line%%#*}"
           line="$(echo "$line" | sed -e 's/^[[:space:]]*//' -e 's/[[:space:]]*$//')"
           
-          # Extract key and value using improved pattern matching
-          if [[ "$line" =~ ^([^:]+)[[:space:]]*:[[:space:]]*(.+)$ ]]; then
-            key="$(echo "${BASH_REMATCH[1]}" | sed -e 's/^[[:space:]]*//' -e 's/[[:space:]]*$//')"
-            value="$(echo "${BASH_REMATCH[2]}" | sed -e 's/^[[:space:]]*//' -e 's/[[:space:]]*$//')"
+          # Check if this is a key-value pair (contains colon not in quotes)
+          if [[ "$line" =~ ^([^:]+):[[:space:]]*(.*)$ ]]; then
+            # Save previous array if we were in one
+            if [ "$in_array" = true ] && [ -n "$current_key" ]; then
+              array_value="[$(IFS=','; echo "${array_items[*]}")]"
+              env_value=$(echo "$array_value" | sed -e 's/\\/\\\\/g' -e 's/\n/\\n/g' -e 's/\r/\\r/g' -e 's/\$/\\$/g' -e 's/`/\\`/g')
+              echo "${current_key}=${env_value}" >> "$GITHUB_ENV"
+              if [ "$current_key" = "app_names" ]; then
+                app_names_value="$array_value"
+              fi
+              echo "Set ${current_key}=${array_value}"
+              in_array=false
+              array_items=()
+            fi
             
+            key="${BASH_REMATCH[1]}"
+            value="${BASH_REMATCH[2]}"
+            
+            # Check if value is an inline array like ["item1","item2"]
+            if [[ "$value" =~ ^\[.*\]$ ]]; then
+              # Inline array - process it
+              env_value=$(echo "$value" | sed -e 's/\\/\\\\/g' -e 's/\n/\\n/g' -e 's/\r/\\r/g' -e 's/\$/\\$/g' -e 's/`/\\`/g')
+              echo "${key}=${env_value}" >> "$GITHUB_ENV"
+              if [ "$key" = "app_names" ]; then
+                app_names_value="$value"
+              fi
+              echo "Set ${key}=${value}"
+            elif [ -z "$value" ]; then
+              # Key with no value - might be start of multi-line array
+              current_key="$key"
+              in_array=false
+              array_items=()
+            else
+              # Regular key-value pair
+              env_value=$(echo "$value" | sed -e 's/\\/\\\\/g' -e 's/\n/\\n/g' -e 's/\r/\\r/g' -e 's/\$/\\$/g' -e 's/`/\\`/g')
+              echo "${key}=${env_value}" >> "$GITHUB_ENV"
+              if [ "$key" = "app_names" ]; then
+                app_names_value="$value"
+              fi
+              echo "Set ${key}=${value}"
+              current_key=""
+            fi
+          # Check if this is an array item (starts with -)
+          elif [[ "$line" =~ ^-[[:space:]]*(.*)$ ]] && [ -n "$current_key" ]; then
+            item="${BASH_REMATCH[1]}"
             # Remove quotes if present
-            value="${value%\"}"
-            value="${value#\"}"
-            
-            # Set the environment variable
-            echo "$key=$value" >> "$GITHUB_ENV"
-            echo "Set $key=$value"
-
+            item=$(echo "$item" | sed -e 's/^["'\'']//' -e 's/["'\'']$//')
+            array_items+=("\"$item\"")
+            in_array=true
+          # Check if this is a continuation of an array (indented line after array start)
+          elif [[ "$line" =~ ^[[:space:]]+ ]] && [ "$in_array" = true ]; then
+            # This might be a continuation, but we'll treat it as a new item if it starts with -
+            if [[ "$line" =~ ^[[:space:]]+-[[:space:]]*(.*)$ ]]; then
+              item="${BASH_REMATCH[1]}"
+              item=$(echo "$item" | sed -e 's/^["'\'']//' -e 's/["'\'']$//')
+              array_items+=("\"$item\"")
+            fi
           else
-            echo "⚠️ Warning: Could not parse line: '$original_line'"
+            # Not a recognized pattern - might be end of array
+            if [ "$in_array" = true ] && [ -n "$current_key" ]; then
+              array_value="[$(IFS=','; echo "${array_items[*]}")]"
+              env_value=$(echo "$array_value" | sed -e 's/\\/\\\\/g' -e 's/\n/\\n/g' -e 's/\r/\\r/g' -e 's/\$/\\$/g' -e 's/`/\\`/g')
+              echo "${current_key}=${env_value}" >> "$GITHUB_ENV"
+              if [ "$current_key" = "app_names" ]; then
+                app_names_value="$array_value"
+              fi
+              echo "Set ${current_key}=${array_value}"
+              in_array=false
+              array_items=()
+              current_key=""
+            fi
           fi
         done < "${{ inputs.inputs_file }}"
+        
+        # Handle array at end of file
+        if [ "$in_array" = true ] && [ -n "$current_key" ]; then
+          array_value="[$(IFS=','; echo "${array_items[*]}")]"
+          env_value=$(echo "$array_value" | sed -e 's/\\/\\\\/g' -e 's/\n/\\n/g' -e 's/\r/\\r/g' -e 's/\$/\\$/g' -e 's/`/\\`/g')
+          echo "${current_key}=${env_value}" >> "$GITHUB_ENV"
+          if [ "$current_key" = "app_names" ]; then
+            app_names_value="$array_value"
+          fi
+          echo "Set ${current_key}=${array_value}"
+        fi
+        
+        # Set app_names output
+        if [ -n "$app_names_value" ]; then
+          {
+            echo "app_names<<EOF"
+            echo "$app_names_value"
+            echo "EOF"
+          } >> "$GITHUB_OUTPUT"
+          echo "✅ Set app_names output (multi-line array supported)"
+        fi
         
         echo "✅ All variables loaded successfully"
       shell: bash
