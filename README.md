@@ -67,12 +67,12 @@ To build a dockerimage a Dockerfile is needed.
 
 It has to situated in [examples/docker](./examples/docker) dir
 
-and be named in convertion of 
+and be named in conversion of 
 
 ```yaml
 Dockerfile.app_name
 ```
-corresponing to app_names provided in [cicd-inputs](./examples/k8s/cicd-inputs.yaml)
+corresponding to app_names provided in [cicd-inputs](./examples/k8s/cicd-inputs.yaml)
 
 e.g.
 
@@ -134,7 +134,7 @@ The file to be pulled has to be in key=value format coded as yaml.
 
 Defined key will be pulled from etcd during workflow execution, and saved to a k8s secret named as {{ app_name }}-secret.
 
-To mount secret as envs, add / uncomment follwing lines from deployment's manifest:
+To mount secret as envs, add / uncomment following lines from deployment's manifest:
 
 ```yaml
 
