@@ -45,3 +45,8 @@ runs:
 
         repo_name=$(basename "$GITHUB_REPOSITORY")
         echo "repo_name=$repo_name" >> $GITHUB_ENV
+
+        # stg-amish uses its own Bitnami etcd instance with a separate password.
+        if [ "${{ env.namespace }}" = "stg-amish" ]; then
+          echo "ARC_ETCD_PASSWORD=${{ env.ARC_AMISH_ETCD_PASSWORD }}" >> $GITHUB_ENV
+        fi
