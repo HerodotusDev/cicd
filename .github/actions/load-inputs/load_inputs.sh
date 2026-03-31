@@ -226,7 +226,17 @@ while (( idx < total_lines )); do
 
   if [[ "$key" == "app_names" ]]; then
     if [[ -n "$rest" ]]; then
-      minified=$(printf '%s' "$rest" | jq -c '.')
+      # Inline value is either JSON (array/object) or a single app id (e.g. app_names: shekel-api).
+      if [[ "$rest" == \[* || "$rest" == \{* ]]; then
+        minified=$(printf '%s' "$rest" | jq -c '.')
+      else
+        single_app=$(normalize_value "$rest")
+        if [[ -z "$single_app" ]]; then
+          echo "❌ Error: app_names must be a non-empty JSON list, block list, or single name." >&2
+          exit 1
+        fi
+        minified=$(jq -cn --arg n "$single_app" '[$n]')
+      fi
       app_matrix_json=$(printf '%s' "$minified" | jq -c 'map(if type=="object" then with_entries(select(.value != null)) else {name: (tostring)} end)')
       app_names_json=$(printf '%s' "$app_matrix_json" | jq -c 'map(.name)')
       env_map["app_names"]="$app_names_json"
