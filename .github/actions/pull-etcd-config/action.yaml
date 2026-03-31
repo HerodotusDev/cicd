@@ -47,6 +47,16 @@ outputs:
 runs:
   using: "composite"
   steps:
+    - name: Resolve ETCD host
+      id: resolve_etcd_host
+      shell: bash
+      run: |
+        if [ "${{ inputs.namespace }}" = "stg-amish" ]; then
+          echo "host=http://amish-etcd.stg-amish.svc.cluster.local:2379" >> "$GITHUB_OUTPUT"
+        else
+          echo "host=${{ inputs.etcd_host }}" >> "$GITHUB_OUTPUT"
+        fi
+
     - name: Pull and Run Secret Preparation Container
       id: pull
       continue-on-error: true
@@ -57,7 +67,7 @@ runs:
       run: |
         set -e
         docker run --rm \
-          -e ETCD_HOST="${{ inputs.etcd_host }}" \
+          -e ETCD_HOST="${{ steps.resolve_etcd_host.outputs.host }}" \
           -e ETCD_USER="${{ inputs.etcd_user }}" \
           -e ETCD_PASSWORD="${{ inputs.etcd_password }}" \
           -e ETCD_KEY="/${{ inputs.etcd_root }}/${{inputs.k8s_env}}/${{ inputs.app_name }}/.env" \
