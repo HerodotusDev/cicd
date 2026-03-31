@@ -53,8 +53,10 @@ runs:
       run: |
         if [ "${{ inputs.namespace }}" = "stg-amish" ]; then
           echo "host=http://amish-etcd.stg-amish.svc.cluster.local:2379" >> "$GITHUB_OUTPUT"
+          echo "docker_network=host" >> "$GITHUB_OUTPUT"
         else
           echo "host=${{ inputs.etcd_host }}" >> "$GITHUB_OUTPUT"
+          echo "docker_network=bridge" >> "$GITHUB_OUTPUT"
         fi
 
     - name: Pull and Run Secret Preparation Container
@@ -66,7 +68,11 @@ runs:
       shell: bash
       run: |
         set -e
-        docker run --rm \
+        NETWORK_FLAG=""
+        if [ "${{ steps.resolve_etcd_host.outputs.docker_network }}" = "host" ]; then
+          NETWORK_FLAG="--network host"
+        fi
+        docker run --rm $NETWORK_FLAG \
           -e ETCD_HOST="${{ steps.resolve_etcd_host.outputs.host }}" \
           -e ETCD_USER="${{ inputs.etcd_user }}" \
           -e ETCD_PASSWORD="${{ inputs.etcd_password }}" \
