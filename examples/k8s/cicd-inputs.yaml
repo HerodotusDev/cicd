@@ -12,6 +12,9 @@ app_names:
     # version_key: package.version  # optional. uses top-level version_key by default.
     # dockerfile: example           # optional. defaults to app name (Dockerfile.example).
     # init: true                    # optional. default false. when true the app only runs through init jobs (not main deploy).
+    # image: example                # optional. for init pods only. reuse another app's Docker image instead of building
+    #                               #   a separate one. when set and different from name, build is skipped and the named
+    #                               #   app's image is injected into the pod manifest. defaults to app name.
   - "example2"                      # plain strings pick up all defaults.
 
 

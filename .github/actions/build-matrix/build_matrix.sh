@@ -119,16 +119,16 @@ fi
 
 while IFS= read -r app_json; do
   init_flag=$(printf '%s' "$app_json" | jq -r '(.init // false) | tostring')
-  name=$(printf '%s' "$app_json" | jq -r '.name')
   if [[ "$init_flag" == "true" ]]; then
-    init_entries+=("$name")
+    init_obj=$(printf '%s' "$app_json" | jq -c '{name: .name, image: (.image // .name), dockerfile: (.dockerfile // .name)}')
+    init_entries+=("$init_obj")
   fi
 done < <(printf '%s' "$matrix_apps" | jq -c '.[]')
 
 if ((${#init_entries[@]} > 0)); then
-  matrix_init=$(printf '%s\n' "${init_entries[@]}" | jq -R -s 'split("\n") | map(select(length>0))' | jq -c '.')
+  matrix_init=$(printf '%s\n' "${init_entries[@]}" | jq -cs '.')
 else
-  matrix_init='["__no_init__"]'
+  matrix_init='[{"name":"__no_init__"}]'
 fi
 
 {

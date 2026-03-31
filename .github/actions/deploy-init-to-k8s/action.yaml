@@ -19,8 +19,12 @@ inputs:
     description: "Docker Hub project or repository prefix."
     required: true
   app_name:
-    description: "Application name (used for image and pod lookups)."
+    description: "Application name (used for pod delete/wait lookups)."
     required: true
+  image_name:
+    description: "Image name to substitute in the manifest. Defaults to app_name when empty."
+    required: false
+    default: ""
 
 runs:
   using: "composite"
@@ -33,7 +37,11 @@ runs:
     - name: Update pod manifest image tag
       run: |
         if [ -f "${{ inputs.pod_manifest }}" ]; then
-          sed -i "s|<IMAGE>|${{ inputs.dockerhub_project }}/${{ (github.ref_name != 'main-main' && github.ref_name != 'main') && 'stg-' || '' }}${{ inputs.app_name }}:${{ inputs.image_tag }}|g" "${{ inputs.pod_manifest }}"
+          IMAGE_NAME="${{ inputs.image_name }}"
+          if [ -z "$IMAGE_NAME" ]; then
+            IMAGE_NAME="${{ inputs.app_name }}"
+          fi
+          sed -i "s|<IMAGE>|${{ inputs.dockerhub_project }}/${{ (github.ref_name != 'main-main' && github.ref_name != 'main') && 'stg-' || '' }}${IMAGE_NAME}:${{ inputs.image_tag }}|g" "${{ inputs.pod_manifest }}"
         else
           echo "Manifest ${{ inputs.pod_manifest }} not found. Nothing to update."
         fi

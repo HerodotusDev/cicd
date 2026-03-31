@@ -85,11 +85,15 @@ jobs:
         app: ${{ fromJson(needs.define-matrix.outputs.matrix_init) }}
     steps:
       - name: Skip init pod build
-        if: ${{ matrix.app == '__no_init__' }}
+        if: ${{ matrix.app.name == '__no_init__' }}
         run: echo "No init pods requested. Skipping build-and-push-init job."
 
+      - name: Skip init pod build (reusing image)
+        if: ${{ matrix.app.name != '__no_init__' && matrix.app.image != matrix.app.name }}
+        run: echo "Init pod ${{ matrix.app.name }} reuses image from ${{ matrix.app.image }}. Skipping build."
+
       - name: Checkout Caller Repository
-        if: ${{ matrix.app != '__no_init__' }}
+        if: ${{ matrix.app.name != '__no_init__' && matrix.app.image == matrix.app.name }}
         uses: actions/checkout@v4
         with:
           repository: ${{ github.repository }}
@@ -98,21 +102,21 @@ jobs:
 
       - name: Load Inputs from YAML
         id: load-init-inputs
-        if: ${{ matrix.app != '__no_init__' }}
+        if: ${{ matrix.app.name != '__no_init__' && matrix.app.image == matrix.app.name }}
         uses: HerodotusDev/cicd/.github/actions/load-inputs@main
         with:
           inputs_file: ${{ env.inputs_files }}
 
       - name: Build and push init image
-        if: ${{ matrix.app != '__no_init__' }}
+        if: ${{ matrix.app.name != '__no_init__' && matrix.app.image == matrix.app.name }}
         uses: HerodotusDev/cicd/.github/actions/build-and-push-image@main
         with:
           dockerhub_project: ${{ env.dockerhub_project }}
-          app_name: ${{ matrix.app }}
+          app_name: ${{ matrix.app.name }}
           version: ${{ needs.define-matrix.outputs.primary_version }}
           docker_username: ${{ env.ARC_DOCKER_USERNAME }}
           docker_password: ${{ env.ARC_DOCKER_PASSWORD }}
-          dockerfile: ${{ github.repository == 'HerodotusDev/backend' && 'storage-proofs' || matrix.app }}
+          dockerfile: ${{ github.repository == 'HerodotusDev/backend' && 'storage-proofs' || matrix.app.dockerfile }}
 
   create-git-tag:
     needs: [define-matrix, build-and-push-image]
@@ -145,11 +149,11 @@ jobs:
         app: ${{ fromJson(needs.define-matrix.outputs.matrix_init) }}
     steps:
       - name: Skip deploy init pods
-        if: ${{ matrix.app == '__no_init__' }}
+        if: ${{ matrix.app.name == '__no_init__' }}
         run: echo "No init pods requested. Skipping deploy-init-pods job."
 
       - name: Checkout Caller Repository
-        if: ${{ matrix.app != '__no_init__' }}
+        if: ${{ matrix.app.name != '__no_init__' }}
         uses: actions/checkout@v4
         with:
           repository: ${{ github.repository }}
@@ -158,21 +162,22 @@ jobs:
 
       - name: Load Inputs from YAML
         id: load-inputs
-        if: ${{ matrix.app != '__no_init__' }}
+        if: ${{ matrix.app.name != '__no_init__' }}
         uses: HerodotusDev/cicd/.github/actions/load-inputs@main
         with:
           inputs_file: ${{ env.inputs_files }}
 
       - name: Deploy init pod
-        if: ${{ matrix.app != '__no_init__' }}
+        if: ${{ matrix.app.name != '__no_init__' }}
         uses: HerodotusDev/cicd/.github/actions/deploy-init-to-k8s@main
         with:
           namespace: ${{ env.namespace }}
-          pod_manifest: ./k8s/${{ env.k8s_env }}/${{ matrix.app }}-pod.yaml
+          pod_manifest: ./k8s/${{ env.k8s_env }}/${{ matrix.app.name }}-pod.yaml
           rollout_timeout: ${{ env.rollout_timeout }}
           image_tag: ${{ needs.define-matrix.outputs.primary_version }}
           dockerhub_project: ${{ env.dockerhub_project }}
-          app_name: ${{ matrix.app }}
+          app_name: ${{ matrix.app.name }}
+          image_name: ${{ matrix.app.image }}
 
   deploy:
     needs: [define-matrix, create-git-tag, build-and-push-image, deploy-init-pods]
