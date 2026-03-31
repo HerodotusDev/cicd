@@ -12,7 +12,7 @@ outputs:
     description: "The app_names value from the inputs file"
     value: ${{ steps.parse-inputs.outputs.app_names }}
   app_matrix:
-    description: "Normalized app metadata derived from app_names"
+    description: "Normalpized app metadata derived from app_names"
     value: ${{ steps.parse-inputs.outputs.app_matrix }}
 
 runs:
@@ -46,7 +46,9 @@ runs:
         repo_name=$(basename "$GITHUB_REPOSITORY")
         echo "repo_name=$repo_name" >> $GITHUB_ENV
 
-        # stg-amish uses its own Bitnami etcd instance with a separate password.
+    - name: Override secrets for stg-amish
+      shell: bash
+      run: |
         if [ "${{ env.namespace }}" = "stg-amish" ]; then
           echo "ARC_ETCD_PASSWORD=${{ env.ARC_AMISH_ETCD_PASSWORD }}" >> $GITHUB_ENV
         fi
