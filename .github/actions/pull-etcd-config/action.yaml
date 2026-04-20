@@ -51,8 +51,8 @@ runs:
       id: resolve_etcd_host
       shell: bash
       run: |
-        if [ "${{ inputs.namespace }}" = "stg-amish" ]; then
-          echo "host=http://amish-etcd.stg-amish.svc.cluster.local:2379" >> "$GITHUB_OUTPUT"
+        if [ "${{ inputs.namespace }}" = "stg-daloc" ]; then
+          echo "host=http://daloc-etcd.stg-daloc.svc.cluster.local:2379" >> "$GITHUB_OUTPUT"
           echo "docker_network=host" >> "$GITHUB_OUTPUT"
         else
           echo "host=${{ inputs.etcd_host }}" >> "$GITHUB_OUTPUT"
