@@ -45,10 +45,3 @@ runs:
 
         repo_name=$(basename "$GITHUB_REPOSITORY")
         echo "repo_name=$repo_name" >> $GITHUB_ENV
-
-    - name: Override secrets for stg-daloc
-      shell: bash
-      run: |
-        if [ "${{ env.namespace }}" = "stg-daloc" ]; then
-          echo "ARC_ETCD_PASSWORD=${{ env.ARC_DALOC_ETCD_PASSWORD }}" >> $GITHUB_ENV
-        fi
