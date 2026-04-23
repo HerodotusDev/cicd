@@ -2,6 +2,10 @@ name: Build & deploy
 
 on:
   workflow_call:
+    secrets:
+      SUBMODULES_PAT:
+        description: "PAT for cloning private submodules. If omitted, submodules are still fetched with GITHUB_TOKEN (works for public submodules)."
+        required: false
 
 env:
   rollout_timeout: 500
@@ -29,7 +33,8 @@ jobs:
         with:
           repository: ${{ github.repository }}
           ref: ${{ github.ref }}
-          token: ${{ secrets.GITHUB_TOKEN }}
+          submodules: recursive
+          token: ${{ secrets.SUBMODULES_PAT || secrets.GITHUB_TOKEN }}
 
       - name: Load Inputs from YAML
         id: load-inputs
@@ -58,7 +63,8 @@ jobs:
         with:
           repository: ${{ github.repository }}
           ref: ${{ github.ref }}
-          token: ${{ secrets.GITHUB_TOKEN }}
+          submodules: recursive
+          token: ${{ secrets.SUBMODULES_PAT || secrets.GITHUB_TOKEN }}
 
       - name: Load Inputs from YAML
         id: load-inputs
@@ -76,6 +82,7 @@ jobs:
           docker_password: ${{ env.ARC_DOCKER_PASSWORD }}
           dockerfile: ${{ github.repository == 'HerodotusDev/backend' && 'storage-proofs' || matrix.app.dockerfile }}
           context: ${{ matrix.app.context }}
+          checkout_token: ${{ secrets.SUBMODULES_PAT }}
 
   build-and-push-init:
     needs: [define-matrix]
@@ -98,7 +105,8 @@ jobs:
         with:
           repository: ${{ github.repository }}
           ref: ${{ github.ref }}
-          token: ${{ secrets.GITHUB_TOKEN }}
+          submodules: recursive
+          token: ${{ secrets.SUBMODULES_PAT || secrets.GITHUB_TOKEN }}
 
       - name: Load Inputs from YAML
         id: load-init-inputs
@@ -117,6 +125,7 @@ jobs:
           docker_username: ${{ env.ARC_DOCKER_USERNAME }}
           docker_password: ${{ env.ARC_DOCKER_PASSWORD }}
           dockerfile: ${{ github.repository == 'HerodotusDev/backend' && 'storage-proofs' || matrix.app.dockerfile }}
+          checkout_token: ${{ secrets.SUBMODULES_PAT }}
 
   create-git-tag:
     needs: [define-matrix, build-and-push-image]
@@ -127,7 +136,8 @@ jobs:
         with:
           repository: ${{ github.repository }}
           ref: ${{ github.ref }}
-          token: ${{ secrets.GITHUB_TOKEN }}
+          submodules: recursive
+          token: ${{ secrets.SUBMODULES_PAT || secrets.GITHUB_TOKEN }}
 
       - name: Load Inputs from YAML
         id: load-inputs
@@ -158,7 +168,8 @@ jobs:
         with:
           repository: ${{ github.repository }}
           ref: ${{ github.ref }}
-          token: ${{ secrets.GITHUB_TOKEN }}
+          submodules: recursive
+          token: ${{ secrets.SUBMODULES_PAT || secrets.GITHUB_TOKEN }}
 
       - name: Load Inputs from YAML
         id: load-inputs
@@ -193,7 +204,8 @@ jobs:
         with:
           repository: ${{ github.repository }}
           ref: ${{ github.ref }}
-          token: ${{ secrets.GITHUB_TOKEN }}
+          submodules: recursive
+          token: ${{ secrets.SUBMODULES_PAT || secrets.GITHUB_TOKEN }}
 
       - name: Load Inputs from YAML
         id: load-inputs

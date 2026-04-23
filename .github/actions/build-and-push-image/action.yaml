@@ -29,12 +29,19 @@ inputs:
     description: "Build context directory."
     required: false
     default: "."
+  checkout_token:
+    description: "Token for checkout (PAT for private submodules, defaults to GITHUB_TOKEN)."
+    required: false
+    default: ""
 
 runs:
   using: "composite"
   steps:
     - name: Checkout code
       uses: actions/checkout@v4
+      with:
+        submodules: recursive
+        token: ${{ inputs.checkout_token || github.token }}
 
 
     - name: Log in to Docker Registry
