@@ -28,10 +28,10 @@ inputs:
 outputs:
   env_file:
     description: 'Absolute path to the written .env file (empty if not found)'
-    value: ${{ steps.pull.outputs.path }}
+    value: ${{ steps.extract.outputs.path }}
   found:
     description: 'Whether the etcd key existed'
-    value: ${{ steps.pull.outputs.found }}
+    value: ${{ steps.extract.outputs.found }}
 
 runs:
   using: 'composite'
@@ -50,11 +50,13 @@ runs:
 
     - name: Pull .env from ETCD
       id: pull
+      continue-on-error: true
       shell: bash
       run: |
-        set -euo pipefail
+        set -e
         ETCD_KEY="/${{ inputs.etcd_root }}/${{ inputs.k8s_env }}/${{ inputs.app_name }}/.env"
-        OUT="/tmp/etcd-build-env"
+        OUTPUT_DIR="${{ github.workspace }}/build-env-output"
+        mkdir -p "${OUTPUT_DIR}"
 
         echo "Fetching etcd key: ${ETCD_KEY}"
 
@@ -64,13 +66,40 @@ runs:
         fi
 
         docker run --rm $NETWORK_FLAG \
-          -e ETCDCTL_API=3 \
-          bitnami/etcd:3.5 \
-          etcdctl \
-            --endpoints="${{ steps.resolve.outputs.host }}" \
-            --user="${{ inputs.etcd_user }}:${{ inputs.etcd_password }}" \
-            get "${ETCD_KEY}" --print-value-only \
-          > "${OUT}" 2>/dev/null || true
+          -e ETCD_HOST="${{ steps.resolve.outputs.host }}" \
+          -e ETCD_USER="${{ inputs.etcd_user }}" \
+          -e ETCD_PASSWORD="${{ inputs.etcd_password }}" \
+          -e ETCD_KEY="${ETCD_KEY}" \
+          -e APP_NAME="${{ inputs.app_name }}" \
+          -e NAMESPACE="${{ inputs.namespace }}" \
+          -v "${OUTPUT_DIR}:/output" \
+          dataprocessor/etcd-pull:0.2 || true
+
+        if [ -s "${OUTPUT_DIR}/secret.yaml" ]; then
+          echo "no_key=false" >> "$GITHUB_OUTPUT"
+          echo "output_dir=${OUTPUT_DIR}" >> "$GITHUB_OUTPUT"
+        else
+          echo "no_key=true" >> "$GITHUB_OUTPUT"
+          echo "::warning::No .env found at etcd key ${ETCD_KEY}"
+        fi
+
+    - name: Extract raw .env from secret
+      id: extract
+      if: steps.pull.outputs.no_key == 'false'
+      shell: bash
+      run: |
+        set -euo pipefail
+        OUTPUT_DIR="${{ steps.pull.outputs.output_dir }}"
+        OUT="/tmp/etcd-build-env"
+
+        sudo chown -R "$(whoami):$(whoami)" "${OUTPUT_DIR}"
+
+        # The secret.yaml has base64-encoded .env under data.".env"
+        # Extract the base64 value and decode it
+        ENV_B64=$(grep '\.env:' "${OUTPUT_DIR}/secret.yaml" | head -1 | awk '{print $2}')
+        if [ -n "${ENV_B64}" ]; then
+          echo "${ENV_B64}" | base64 -d > "${OUT}"
+        fi
 
         if [ -s "${OUT}" ]; then
           echo "found=true" >> "$GITHUB_OUTPUT"
@@ -79,5 +108,7 @@ runs:
         else
           echo "found=false" >> "$GITHUB_OUTPUT"
           echo "path=" >> "$GITHUB_OUTPUT"
-          echo "::warning::No .env found at etcd key ${ETCD_KEY}"
+          echo "::warning::Failed to decode .env from secret.yaml"
         fi
+
+        rm -rf "${OUTPUT_DIR}"
