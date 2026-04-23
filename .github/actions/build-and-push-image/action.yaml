@@ -49,7 +49,9 @@ runs:
     - name: Fetch submodules
       if: inputs.submodules != 'false'
       shell: bash
-      run: git submodule update --init --depth=1 ${{ inputs.submodules == 'recursive' && '--recursive' || '' }}
+      run: |
+        git config --global url."https://x-access-token:${{ inputs.checkout_token || github.token }}@github.com/".insteadOf "https://github.com/"
+        git submodule update --init --depth=1 ${{ inputs.submodules == 'recursive' && '--recursive' || '' }}
 
 
     - name: Log in to Docker Registry

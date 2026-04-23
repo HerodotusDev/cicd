@@ -44,7 +44,11 @@ jobs:
       - name: Fetch submodules
         if: inputs.submodules != 'false'
         shell: bash
-        run: git submodule update --init --depth=1 ${{ inputs.submodules == 'recursive' && '--recursive' || '' }}
+        env:
+          TOKEN: ${{ secrets.SUBMODULES_PAT || secrets.GITHUB_TOKEN }}
+        run: |
+          git config --global url."https://x-access-token:${TOKEN}@github.com/".insteadOf "https://github.com/"
+          git submodule update --init --depth=1 ${{ inputs.submodules == 'recursive' && '--recursive' || '' }}
 
       - name: Load Inputs from YAML
         id: load-inputs
@@ -78,7 +82,11 @@ jobs:
       - name: Fetch submodules
         if: inputs.submodules != 'false'
         shell: bash
-        run: git submodule update --init --depth=1 ${{ inputs.submodules == 'recursive' && '--recursive' || '' }}
+        env:
+          TOKEN: ${{ secrets.SUBMODULES_PAT || secrets.GITHUB_TOKEN }}
+        run: |
+          git config --global url."https://x-access-token:${TOKEN}@github.com/".insteadOf "https://github.com/"
+          git submodule update --init --depth=1 ${{ inputs.submodules == 'recursive' && '--recursive' || '' }}
 
       - name: Load Inputs from YAML
         id: load-inputs
@@ -125,7 +133,11 @@ jobs:
       - name: Fetch submodules
         if: ${{ matrix.app.name != '__no_init__' && matrix.app.image == matrix.app.name && inputs.submodules != 'false' }}
         shell: bash
-        run: git submodule update --init --depth=1 ${{ inputs.submodules == 'recursive' && '--recursive' || '' }}
+        env:
+          TOKEN: ${{ secrets.SUBMODULES_PAT || secrets.GITHUB_TOKEN }}
+        run: |
+          git config --global url."https://x-access-token:${TOKEN}@github.com/".insteadOf "https://github.com/"
+          git submodule update --init --depth=1 ${{ inputs.submodules == 'recursive' && '--recursive' || '' }}
 
       - name: Load Inputs from YAML
         id: load-init-inputs
@@ -161,7 +173,11 @@ jobs:
       - name: Fetch submodules
         if: inputs.submodules != 'false'
         shell: bash
-        run: git submodule update --init --depth=1 ${{ inputs.submodules == 'recursive' && '--recursive' || '' }}
+        env:
+          TOKEN: ${{ secrets.SUBMODULES_PAT || secrets.GITHUB_TOKEN }}
+        run: |
+          git config --global url."https://x-access-token:${TOKEN}@github.com/".insteadOf "https://github.com/"
+          git submodule update --init --depth=1 ${{ inputs.submodules == 'recursive' && '--recursive' || '' }}
 
       - name: Load Inputs from YAML
         id: load-inputs
@@ -197,7 +213,11 @@ jobs:
       - name: Fetch submodules
         if: ${{ matrix.app.name != '__no_init__' && inputs.submodules != 'false' }}
         shell: bash
-        run: git submodule update --init --depth=1 ${{ inputs.submodules == 'recursive' && '--recursive' || '' }}
+        env:
+          TOKEN: ${{ secrets.SUBMODULES_PAT || secrets.GITHUB_TOKEN }}
+        run: |
+          git config --global url."https://x-access-token:${TOKEN}@github.com/".insteadOf "https://github.com/"
+          git submodule update --init --depth=1 ${{ inputs.submodules == 'recursive' && '--recursive' || '' }}
 
       - name: Load Inputs from YAML
         id: load-inputs
@@ -237,7 +257,11 @@ jobs:
       - name: Fetch submodules
         if: inputs.submodules != 'false'
         shell: bash
-        run: git submodule update --init --depth=1 ${{ inputs.submodules == 'recursive' && '--recursive' || '' }}
+        env:
+          TOKEN: ${{ secrets.SUBMODULES_PAT || secrets.GITHUB_TOKEN }}
+        run: |
+          git config --global url."https://x-access-token:${TOKEN}@github.com/".insteadOf "https://github.com/"
+          git submodule update --init --depth=1 ${{ inputs.submodules == 'recursive' && '--recursive' || '' }}
 
       - name: Load Inputs from YAML
         id: load-inputs
