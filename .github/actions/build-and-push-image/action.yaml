@@ -33,6 +33,10 @@ inputs:
     description: "Token for checkout (PAT for private submodules, defaults to GITHUB_TOKEN)."
     required: false
     default: ""
+  submodules:
+    description: "Submodule checkout mode: 'true' (direct only, default), 'recursive' (all nested), or 'false' (none)."
+    required: false
+    default: "true"
 
 runs:
   using: "composite"
@@ -40,7 +44,7 @@ runs:
     - name: Checkout code
       uses: actions/checkout@v4
       with:
-        submodules: recursive
+        submodules: ${{ inputs.submodules }}
         token: ${{ inputs.checkout_token || github.token }}
 
 

@@ -2,6 +2,12 @@ name: Build & deploy
 
 on:
   workflow_call:
+    inputs:
+      submodules:
+        description: "Submodule checkout mode: 'true' (direct only, default), 'recursive' (all nested), or 'false' (none)."
+        type: string
+        required: false
+        default: "true"
     secrets:
       SUBMODULES_PAT:
         description: "PAT for cloning private submodules. If omitted, submodules are still fetched with GITHUB_TOKEN (works for public submodules)."
@@ -33,7 +39,7 @@ jobs:
         with:
           repository: ${{ github.repository }}
           ref: ${{ github.ref }}
-          submodules: recursive
+          submodules: ${{ inputs.submodules }}
           token: ${{ secrets.SUBMODULES_PAT || secrets.GITHUB_TOKEN }}
 
       - name: Load Inputs from YAML
@@ -63,7 +69,7 @@ jobs:
         with:
           repository: ${{ github.repository }}
           ref: ${{ github.ref }}
-          submodules: recursive
+          submodules: ${{ inputs.submodules }}
           token: ${{ secrets.SUBMODULES_PAT || secrets.GITHUB_TOKEN }}
 
       - name: Load Inputs from YAML
@@ -83,6 +89,7 @@ jobs:
           dockerfile: ${{ github.repository == 'HerodotusDev/backend' && 'storage-proofs' || matrix.app.dockerfile }}
           context: ${{ matrix.app.context }}
           checkout_token: ${{ secrets.SUBMODULES_PAT }}
+          submodules: ${{ inputs.submodules }}
 
   build-and-push-init:
     needs: [define-matrix]
@@ -105,7 +112,7 @@ jobs:
         with:
           repository: ${{ github.repository }}
           ref: ${{ github.ref }}
-          submodules: recursive
+          submodules: ${{ inputs.submodules }}
           token: ${{ secrets.SUBMODULES_PAT || secrets.GITHUB_TOKEN }}
 
       - name: Load Inputs from YAML
@@ -126,6 +133,7 @@ jobs:
           docker_password: ${{ env.ARC_DOCKER_PASSWORD }}
           dockerfile: ${{ github.repository == 'HerodotusDev/backend' && 'storage-proofs' || matrix.app.dockerfile }}
           checkout_token: ${{ secrets.SUBMODULES_PAT }}
+          submodules: ${{ inputs.submodules }}
 
   create-git-tag:
     needs: [define-matrix, build-and-push-image]
@@ -136,7 +144,7 @@ jobs:
         with:
           repository: ${{ github.repository }}
           ref: ${{ github.ref }}
-          submodules: recursive
+          submodules: ${{ inputs.submodules }}
           token: ${{ secrets.SUBMODULES_PAT || secrets.GITHUB_TOKEN }}
 
       - name: Load Inputs from YAML
@@ -168,7 +176,7 @@ jobs:
         with:
           repository: ${{ github.repository }}
           ref: ${{ github.ref }}
-          submodules: recursive
+          submodules: ${{ inputs.submodules }}
           token: ${{ secrets.SUBMODULES_PAT || secrets.GITHUB_TOKEN }}
 
       - name: Load Inputs from YAML
@@ -204,7 +212,7 @@ jobs:
         with:
           repository: ${{ github.repository }}
           ref: ${{ github.ref }}
-          submodules: recursive
+          submodules: ${{ inputs.submodules }}
           token: ${{ secrets.SUBMODULES_PAT || secrets.GITHUB_TOKEN }}
 
       - name: Load Inputs from YAML
