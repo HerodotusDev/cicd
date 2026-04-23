@@ -1,0 +1,83 @@
+name: 'Pull ETCD Build Env'
+description: 'Fetch a .env file from ETCD and write it to /tmp so it survives a later checkout step.'
+
+inputs:
+  etcd_host:
+    description: 'ETCD endpoint'
+    required: false
+    default: http://etcd.etcd.svc.cluster.local:2379
+  etcd_user:
+    description: 'ETCD username'
+    required: true
+  etcd_password:
+    description: 'ETCD password'
+    required: true
+  etcd_root:
+    description: 'ETCD root path'
+    required: true
+  app_name:
+    description: 'Application name (etcd key segment)'
+    required: true
+  k8s_env:
+    description: 'Kubernetes environment (stg / prod)'
+    required: true
+  namespace:
+    description: 'Kubernetes namespace (used to resolve etcd host)'
+    required: true
+
+outputs:
+  env_file:
+    description: 'Absolute path to the written .env file (empty if not found)'
+    value: ${{ steps.pull.outputs.path }}
+  found:
+    description: 'Whether the etcd key existed'
+    value: ${{ steps.pull.outputs.found }}
+
+runs:
+  using: 'composite'
+  steps:
+    - name: Resolve ETCD host
+      id: resolve
+      shell: bash
+      run: |
+        if [ "${{ inputs.namespace }}" = "stg-daloc" ]; then
+          echo "host=http://daloc-etcd.stg-daloc.svc.cluster.local:2379" >> "$GITHUB_OUTPUT"
+          echo "docker_network=host" >> "$GITHUB_OUTPUT"
+        else
+          echo "host=${{ inputs.etcd_host }}" >> "$GITHUB_OUTPUT"
+          echo "docker_network=bridge" >> "$GITHUB_OUTPUT"
+        fi
+
+    - name: Pull .env from ETCD
+      id: pull
+      shell: bash
+      run: |
+        set -euo pipefail
+        ETCD_KEY="/${{ inputs.etcd_root }}/${{ inputs.k8s_env }}/${{ inputs.app_name }}/.env"
+        OUT="/tmp/etcd-build-env"
+
+        echo "Fetching etcd key: ${ETCD_KEY}"
+
+        NETWORK_FLAG=""
+        if [ "${{ steps.resolve.outputs.docker_network }}" = "host" ]; then
+          NETWORK_FLAG="--network host"
+        fi
+
+        docker run --rm $NETWORK_FLAG \
+          -e ETCDCTL_API=3 \
+          bitnami/etcd:3.5 \
+          etcdctl \
+            --endpoints="${{ steps.resolve.outputs.host }}" \
+            --user="${{ inputs.etcd_user }}:${{ inputs.etcd_password }}" \
+            get "${ETCD_KEY}" --print-value-only \
+          > "${OUT}" 2>/dev/null || true
+
+        if [ -s "${OUT}" ]; then
+          echo "found=true" >> "$GITHUB_OUTPUT"
+          echo "path=${OUT}" >> "$GITHUB_OUTPUT"
+          echo "Wrote $(wc -l < "${OUT}") lines to ${OUT}"
+        else
+          echo "found=false" >> "$GITHUB_OUTPUT"
+          echo "path=" >> "$GITHUB_OUTPUT"
+          echo "::warning::No .env found at etcd key ${ETCD_KEY}"
+        fi

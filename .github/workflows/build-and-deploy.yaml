@@ -94,6 +94,18 @@ jobs:
         with:
           inputs_file: ${{ env.inputs_files }}
 
+      - name: Pull build-time .env from ETCD
+        id: build-env
+        if: matrix.app.etcd_build_env == true
+        uses: HerodotusDev/cicd/.github/actions/pull-etcd-build-env@main
+        with:
+          namespace: ${{ env.namespace }}
+          app_name: ${{ matrix.app.etcd_name || matrix.app.name }}
+          etcd_root: ${{ env.etcd_root || env.repo_name }}
+          etcd_user: ${{ env.ARC_ETCD_USER }}
+          etcd_password: ${{ env.ARC_ETCD_PASSWORD }}
+          k8s_env: ${{ env.k8s_env }}
+
       - name: Build and push image
         uses: HerodotusDev/cicd/.github/actions/build-and-push-image@main
         with:
@@ -106,6 +118,7 @@ jobs:
           context: ${{ matrix.app.context }}
           checkout_token: ${{ secrets.SUBMODULES_PAT }}
           submodules: ${{ inputs.submodules }}
+          build_env_file: ${{ steps.build-env.outputs.env_file }}
 
   build-and-push-init:
     needs: [define-matrix]

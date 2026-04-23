@@ -29,6 +29,10 @@ inputs:
     description: "Build context directory."
     required: false
     default: "."
+  build_env_file:
+    description: "Absolute path to a .env file to inject into the build context as .env.production (written before Docker build, after checkout)."
+    required: false
+    default: ""
   checkout_token:
     description: "Token for checkout (PAT for private submodules, defaults to GITHUB_TOKEN)."
     required: false
@@ -53,6 +57,17 @@ runs:
         git config --global url."https://x-access-token:${{ inputs.checkout_token || github.token }}@github.com/".insteadOf "https://github.com/"
         git submodule update --init --depth=1 ${{ inputs.submodules == 'recursive' && '--recursive' || '' }}
 
+
+    - name: Inject build-time .env
+      if: inputs.build_env_file != ''
+      shell: bash
+      run: |
+        if [ -f "${{ inputs.build_env_file }}" ]; then
+          cp "${{ inputs.build_env_file }}" "${{ inputs.context || '.' }}/.env.production"
+          echo "Injected .env.production ($(wc -l < "${{ inputs.context || '.' }}/.env.production") lines) into build context"
+        else
+          echo "::warning::build_env_file set but file not found at ${{ inputs.build_env_file }}"
+        fi
 
     - name: Log in to Docker Registry
       uses: docker/login-action@v3
