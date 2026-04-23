@@ -39,8 +39,12 @@ jobs:
         with:
           repository: ${{ github.repository }}
           ref: ${{ github.ref }}
-          submodules: ${{ inputs.submodules }}
           token: ${{ secrets.SUBMODULES_PAT || secrets.GITHUB_TOKEN }}
+
+      - name: Fetch submodules
+        if: inputs.submodules != 'false'
+        shell: bash
+        run: git submodule update --init --depth=1 ${{ inputs.submodules == 'recursive' && '--recursive' || '' }}
 
       - name: Load Inputs from YAML
         id: load-inputs
@@ -69,8 +73,12 @@ jobs:
         with:
           repository: ${{ github.repository }}
           ref: ${{ github.ref }}
-          submodules: ${{ inputs.submodules }}
           token: ${{ secrets.SUBMODULES_PAT || secrets.GITHUB_TOKEN }}
+
+      - name: Fetch submodules
+        if: inputs.submodules != 'false'
+        shell: bash
+        run: git submodule update --init --depth=1 ${{ inputs.submodules == 'recursive' && '--recursive' || '' }}
 
       - name: Load Inputs from YAML
         id: load-inputs
@@ -112,8 +120,12 @@ jobs:
         with:
           repository: ${{ github.repository }}
           ref: ${{ github.ref }}
-          submodules: ${{ inputs.submodules }}
           token: ${{ secrets.SUBMODULES_PAT || secrets.GITHUB_TOKEN }}
+
+      - name: Fetch submodules
+        if: ${{ matrix.app.name != '__no_init__' && matrix.app.image == matrix.app.name && inputs.submodules != 'false' }}
+        shell: bash
+        run: git submodule update --init --depth=1 ${{ inputs.submodules == 'recursive' && '--recursive' || '' }}
 
       - name: Load Inputs from YAML
         id: load-init-inputs
@@ -144,8 +156,12 @@ jobs:
         with:
           repository: ${{ github.repository }}
           ref: ${{ github.ref }}
-          submodules: ${{ inputs.submodules }}
           token: ${{ secrets.SUBMODULES_PAT || secrets.GITHUB_TOKEN }}
+
+      - name: Fetch submodules
+        if: inputs.submodules != 'false'
+        shell: bash
+        run: git submodule update --init --depth=1 ${{ inputs.submodules == 'recursive' && '--recursive' || '' }}
 
       - name: Load Inputs from YAML
         id: load-inputs
@@ -176,8 +192,12 @@ jobs:
         with:
           repository: ${{ github.repository }}
           ref: ${{ github.ref }}
-          submodules: ${{ inputs.submodules }}
           token: ${{ secrets.SUBMODULES_PAT || secrets.GITHUB_TOKEN }}
+
+      - name: Fetch submodules
+        if: ${{ matrix.app.name != '__no_init__' && inputs.submodules != 'false' }}
+        shell: bash
+        run: git submodule update --init --depth=1 ${{ inputs.submodules == 'recursive' && '--recursive' || '' }}
 
       - name: Load Inputs from YAML
         id: load-inputs
@@ -212,8 +232,12 @@ jobs:
         with:
           repository: ${{ github.repository }}
           ref: ${{ github.ref }}
-          submodules: ${{ inputs.submodules }}
           token: ${{ secrets.SUBMODULES_PAT || secrets.GITHUB_TOKEN }}
+
+      - name: Fetch submodules
+        if: inputs.submodules != 'false'
+        shell: bash
+        run: git submodule update --init --depth=1 ${{ inputs.submodules == 'recursive' && '--recursive' || '' }}
 
       - name: Load Inputs from YAML
         id: load-inputs

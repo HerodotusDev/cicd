@@ -44,8 +44,12 @@ runs:
     - name: Checkout code
       uses: actions/checkout@v4
       with:
-        submodules: ${{ inputs.submodules }}
         token: ${{ inputs.checkout_token || github.token }}
+
+    - name: Fetch submodules
+      if: inputs.submodules != 'false'
+      shell: bash
+      run: git submodule update --init --depth=1 ${{ inputs.submodules == 'recursive' && '--recursive' || '' }}
 
 
     - name: Log in to Docker Registry
