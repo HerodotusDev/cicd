@@ -1,40 +1,40 @@
-name: 'Pull ETCD Build Env'
-description: 'Fetch a .env file from ETCD and write it to /tmp so it survives a later checkout step.'
+name: "Pull ETCD Build Env"
+description: "Fetch a .env file from ETCD and write it to /tmp so it survives a later checkout step."
 
 inputs:
   etcd_host:
-    description: 'ETCD endpoint'
+    description: "ETCD endpoint"
     required: false
     default: http://etcd.etcd.svc.cluster.local:2379
   etcd_user:
-    description: 'ETCD username'
+    description: "ETCD username"
     required: true
   etcd_password:
-    description: 'ETCD password'
+    description: "ETCD password"
     required: true
   etcd_root:
-    description: 'ETCD root path'
+    description: "ETCD root path"
     required: true
   app_name:
-    description: 'Application name (etcd key segment)'
+    description: "Application name (etcd key segment)"
     required: true
   k8s_env:
-    description: 'Kubernetes environment (stg / prod)'
+    description: "Kubernetes environment (stg / prod)"
     required: true
   namespace:
-    description: 'Kubernetes namespace (used to resolve etcd host)'
+    description: "Kubernetes namespace (used to resolve etcd host)"
     required: true
 
 outputs:
   env_file:
-    description: 'Absolute path to the written .env file (empty if not found)'
+    description: "Absolute path to the written .env file (empty if not found)"
     value: ${{ steps.extract.outputs.path }}
   found:
-    description: 'Whether the etcd key existed'
+    description: "Whether the etcd key existed"
     value: ${{ steps.extract.outputs.found }}
 
 runs:
-  using: 'composite'
+  using: "composite"
   steps:
     - name: Resolve ETCD host
       id: resolve
@@ -94,12 +94,25 @@ runs:
 
         sudo chown -R "$(whoami):$(whoami)" "${OUTPUT_DIR}"
 
-        # The secret.yaml has base64-encoded .env under data.".env"
-        # Extract the base64 value and decode it
-        ENV_B64=$(grep '\.env:' "${OUTPUT_DIR}/secret.yaml" | head -1 | awk '{print $2}')
-        if [ -n "${ENV_B64}" ]; then
-          echo "${ENV_B64}" | base64 -d > "${OUT}"
-        fi
+        # Secret data has one key per env var, each base64-encoded.
+        # Reconstruct a .env file: decode each value and write KEY=VALUE lines.
+        in_data=false
+        while IFS= read -r line; do
+          if [[ "$line" == "data:" ]]; then
+            in_data=true
+            continue
+          fi
+          if $in_data; then
+            if [[ "$line" =~ ^[[:space:]]+([^:]+):[[:space:]]+(.+)$ ]]; then
+              key="${BASH_REMATCH[1]}"
+              val="${BASH_REMATCH[2]}"
+              decoded=$(echo "$val" | base64 -d 2>/dev/null || echo "$val")
+              echo "${key}=${decoded}" >> "${OUT}"
+            elif [[ ! "$line" =~ ^[[:space:]] ]]; then
+              break
+            fi
+          fi
+        done < "${OUTPUT_DIR}/secret.yaml"
 
         if [ -s "${OUT}" ]; then
           echo "found=true" >> "$GITHUB_OUTPUT"
@@ -108,7 +121,7 @@ runs:
         else
           echo "found=false" >> "$GITHUB_OUTPUT"
           echo "path=" >> "$GITHUB_OUTPUT"
-          echo "::warning::Failed to decode .env from secret.yaml"
+          echo "::warning::Failed to extract env vars from secret.yaml"
         fi
 
         rm -rf "${OUTPUT_DIR}"
