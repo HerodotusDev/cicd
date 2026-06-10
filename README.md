@@ -15,6 +15,25 @@
 5. Commit the version source files referenced in `version_file` (for example `Cargo.toml`, `package.json`).
 6. Push to `develop` for staging deployment and to `main` for production. Other branches will be blocked.
 
+## AI-assisted setup (cicd-onboard skill)
+This repo ships a `cicd-onboard` skill (`.cursor/skills/cicd-onboard/`) that lets an AI coding agent (Claude Code, Cursor, etc.) wire CI/CD into an app repo for you. Install it with the bundled script:
+
+```bash
+# global: symlink into ~/.claude + ~/.agents (default; tracks this checkout)
+tools/install-skill.sh
+
+# into a specific app repo's .claude/.agents/.cursor
+tools/install-skill.sh --repo /path/to/app-repo
+
+# copy instead of symlink (portable, but goes stale on cicd updates)
+tools/install-skill.sh --copy
+tools/install-skill.sh --repo /path/to/app-repo --copy
+
+tools/install-skill.sh --help   # full usage
+```
+
+The default symlink tracks this checkout, so `git pull` in the cicd repo updates the skill everywhere. Use `--copy` only when the cicd repo won't be present (e.g. committing the skill into an app repo for teammates). Once installed, ask the agent to onboard the repo and it follows the skill.
+
 ## Etcd configuration
 Upload the configuration file to etcd before the workflow runs. The workflow reads `/etcd_root/k8s_env/app_name/.env` and writes it into `<app_name>-secret`.
 The secret is mounted into the container and configuration is accessible as system envs.
