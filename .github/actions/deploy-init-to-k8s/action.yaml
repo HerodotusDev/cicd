@@ -25,6 +25,10 @@ inputs:
     description: "Image name to substitute in the manifest. Defaults to app_name when empty."
     required: false
     default: ""
+  image_prefix:
+    description: "Image name prefix for the target environment ('stg-' or ''). Derived once in load-inputs; passed in by the caller."
+    required: false
+    default: ""
 
 runs:
   using: "composite"
@@ -41,7 +45,7 @@ runs:
           if [ -z "$IMAGE_NAME" ]; then
             IMAGE_NAME="${{ inputs.app_name }}"
           fi
-          sed -i "s|<IMAGE>|${{ inputs.dockerhub_project }}/${{ (github.ref_name != 'main-main' && github.ref_name != 'main') && 'stg-' || '' }}${IMAGE_NAME}:${{ inputs.image_tag }}|g" "${{ inputs.pod_manifest }}"
+          sed -i "s|<IMAGE>|${{ inputs.dockerhub_project }}/${{ inputs.image_prefix }}${IMAGE_NAME}:${{ inputs.image_tag }}|g" "${{ inputs.pod_manifest }}"
         else
           echo "Manifest ${{ inputs.pod_manifest }} not found. Nothing to update."
         fi

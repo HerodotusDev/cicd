@@ -1,0 +1,76 @@
+name: "Resolve consumer overrides"
+description: "Resolves per-consumer pipeline special-cases from the central overrides.yaml in this repo, so developer repos stay free of pipeline-specific rules. Requires yq on PATH (load-inputs bootstraps it earlier in the job)."
+
+inputs:
+  repository:
+    description: "owner/repo to resolve build overrides for (usually github.repository)."
+    required: false
+    default: ""
+  namespace:
+    description: "Target namespace (post stg-/prod- rewrite) for the etcd host lookup."
+    required: false
+    default: ""
+  app_name:
+    description: "App name for app_arg / also-restart lookup."
+    required: false
+    default: ""
+  default_dockerfile:
+    description: "Dockerfile suffix to use when the repo has no dockerfile override."
+    required: false
+    default: ""
+
+outputs:
+  dockerfile:
+    description: "Effective Dockerfile suffix (override or default)."
+    value: ${{ steps.resolve.outputs.dockerfile }}
+  app_arg:
+    description: "APP_NAME build-arg value: app-<name>, with any repo strip-prefix applied."
+    value: ${{ steps.resolve.outputs.app_arg }}
+  also_restart:
+    description: "Comma-separated deployments to also restart after this app deploys (empty if none)."
+    value: ${{ steps.resolve.outputs.also_restart }}
+  etcd_host:
+    description: "etcd host override for the namespace (empty if none)."
+    value: ${{ steps.resolve.outputs.etcd_host }}
+  etcd_docker_network:
+    description: "docker network for the etcd-pull container when an override applies (empty if none)."
+    value: ${{ steps.resolve.outputs.etcd_docker_network }}
+
+runs:
+  using: "composite"
+  steps:
+    - name: Resolve
+      id: resolve
+      shell: bash
+      env:
+        REPO: ${{ inputs.repository }}
+        NS: ${{ inputs.namespace }}
+        APP: ${{ inputs.app_name }}
+        DEFAULT_DOCKERFILE: ${{ inputs.default_dockerfile }}
+      run: |
+        set -euo pipefail
+        f="$GITHUB_ACTION_PATH/overrides.yaml"
+        if ! command -v yq >/dev/null 2>&1; then
+          echo "::error::yq is required by resolve-overrides (load-inputs normally bootstraps it)."
+          exit 1
+        fi
+
+        dockerfile=$(yq ".repos.\"${REPO}\".dockerfile // \"\"" "$f")
+        [ -z "$dockerfile" ] && dockerfile="$DEFAULT_DOCKERFILE"
+
+        strip=$(yq ".repos.\"${REPO}\".app_arg_strip_prefix // \"\"" "$f")
+        app_base="$APP"
+        [ -n "$strip" ] && app_base="${APP#"$strip"}"
+        app_arg="app-${app_base}"
+
+        also_restart=$(yq ".restart_also.\"${APP}\" // [] | join(\",\")" "$f")
+        etcd_host=$(yq ".etcd_hosts.\"${NS}\".host // \"\"" "$f")
+        etcd_net=$(yq ".etcd_hosts.\"${NS}\".docker_network // \"\"" "$f")
+
+        {
+          echo "dockerfile=$dockerfile"
+          echo "app_arg=$app_arg"
+          echo "also_restart=$also_restart"
+          echo "etcd_host=$etcd_host"
+          echo "etcd_docker_network=$etcd_net"
+        } >> "$GITHUB_OUTPUT"

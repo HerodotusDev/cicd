@@ -1,0 +1,33 @@
+# Centralized per-consumer pipeline special-cases.
+#
+# This file lives inside the cicd repo (not consumer repos) so developer repos
+# stay free of pipeline-specific rules. The resolve-overrides action reads it
+# via $GITHUB_ACTION_PATH and emits the resolved values; the build/deploy/etcd
+# actions consume those outputs. To onboard a new special-case, edit ONLY this
+# file — no consumer-repo or workflow changes needed.
+
+# Repo-level build overrides, keyed by "owner/repo".
+repos:
+  HerodotusDev/backend:
+    # Every app in this repo builds from docker/Dockerfile.storage-proofs.
+    dockerfile: storage-proofs
+    # APP_NAME build-arg = app-<app_name with this leading prefix removed>.
+    app_arg_strip_prefix: storage-proofs-
+
+  # Test fixture for the cicd_test e2e harness — proves the override path reads
+  # this file on the runner (APP_NAME build-arg for test-ui resolves to app-ui).
+  # Safe to remove once the pipeline is validated.
+  HerodotusDev/cicd_test:
+    app_arg_strip_prefix: test-
+
+# After an app deploys, also `rollout restart` these deployments (keyed by app).
+restart_also:
+  atlantic-server:
+    - atlantic-workers
+
+# etcd endpoint overrides keyed by target namespace. When a namespace is absent
+# here, the action's default host is used with the bridge docker network.
+etcd_hosts:
+  stg-daloc:
+    host: http://daloc-etcd.stg-daloc.svc.cluster.local:2379
+    docker_network: host

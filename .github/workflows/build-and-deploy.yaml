@@ -1,4 +1,4 @@
-name: Build & deploy 
+name: Build & deploy
 
 on:
   workflow_call:
@@ -24,7 +24,13 @@ permissions:
   contents: write
 
 jobs:
+  guard:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: HerodotusDev/cicd/.github/actions/guard-branch@main
+
   define-matrix:
+    needs: [guard]
     runs-on: gcp-arc-runners
     outputs:
       matrix_apps: ${{ steps.build-matrix.outputs.matrix_apps }}
@@ -34,21 +40,11 @@ jobs:
       primary_version: ${{ steps.build-matrix.outputs.primary_version }}
       unique_versions: ${{ steps.build-matrix.outputs.unique_versions }}
     steps:
-      - name: Checkout Caller Repository
-        uses: actions/checkout@v4
+      - name: Checkout caller repo
+        uses: HerodotusDev/cicd/.github/actions/checkout-repo@main
         with:
-          repository: ${{ github.repository }}
-          ref: ${{ github.ref }}
           token: ${{ secrets.SUBMODULES_PAT || secrets.GITHUB_TOKEN }}
-
-      - name: Fetch submodules
-        if: inputs.submodules != 'false'
-        shell: bash
-        env:
-          TOKEN: ${{ secrets.SUBMODULES_PAT || secrets.GITHUB_TOKEN }}
-        run: |
-          git config --global url."https://x-access-token:${TOKEN}@github.com/".insteadOf "https://github.com/"
-          git submodule update --init --depth=1 ${{ inputs.submodules == 'recursive' && '--recursive' || '' }}
+          submodules: ${{ inputs.submodules }}
 
       - name: Load Inputs from YAML
         id: load-inputs
@@ -72,21 +68,11 @@ jobs:
       matrix:
         app: ${{ fromJson(needs.define-matrix.outputs.matrix_deploy) }}
     steps:
-      - name: Checkout Caller Repository
-        uses: actions/checkout@v4
+      - name: Checkout caller repo
+        uses: HerodotusDev/cicd/.github/actions/checkout-repo@main
         with:
-          repository: ${{ github.repository }}
-          ref: ${{ github.ref }}
           token: ${{ secrets.SUBMODULES_PAT || secrets.GITHUB_TOKEN }}
-
-      - name: Fetch submodules
-        if: inputs.submodules != 'false'
-        shell: bash
-        env:
-          TOKEN: ${{ secrets.SUBMODULES_PAT || secrets.GITHUB_TOKEN }}
-        run: |
-          git config --global url."https://x-access-token:${TOKEN}@github.com/".insteadOf "https://github.com/"
-          git submodule update --init --depth=1 ${{ inputs.submodules == 'recursive' && '--recursive' || '' }}
+          submodules: ${{ inputs.submodules }}
 
       - name: Load Inputs from YAML
         id: load-inputs
@@ -111,10 +97,11 @@ jobs:
         with:
           dockerhub_project: ${{ env.dockerhub_project }}
           app_name: ${{ matrix.app.name }}
+          image_prefix: ${{ env.image_prefix }}
           version: ${{ fromJson(needs.define-matrix.outputs.app_versions)[matrix.app.name] }}
           docker_username: ${{ env.ARC_DOCKER_USERNAME }}
           docker_password: ${{ env.ARC_DOCKER_PASSWORD }}
-          dockerfile: ${{ github.repository == 'HerodotusDev/backend' && 'storage-proofs' || matrix.app.dockerfile }}
+          dockerfile: ${{ matrix.app.dockerfile }}
           context: ${{ matrix.app.context }}
           checkout_token: ${{ secrets.SUBMODULES_PAT }}
           submodules: ${{ inputs.submodules }}
@@ -135,22 +122,12 @@ jobs:
         if: ${{ matrix.app.name != '__no_init__' && matrix.app.image != matrix.app.name }}
         run: echo "Init pod ${{ matrix.app.name }} reuses image from ${{ matrix.app.image }}. Skipping build."
 
-      - name: Checkout Caller Repository
+      - name: Checkout caller repo
         if: ${{ matrix.app.name != '__no_init__' && matrix.app.image == matrix.app.name }}
-        uses: actions/checkout@v4
+        uses: HerodotusDev/cicd/.github/actions/checkout-repo@main
         with:
-          repository: ${{ github.repository }}
-          ref: ${{ github.ref }}
           token: ${{ secrets.SUBMODULES_PAT || secrets.GITHUB_TOKEN }}
-
-      - name: Fetch submodules
-        if: ${{ matrix.app.name != '__no_init__' && matrix.app.image == matrix.app.name && inputs.submodules != 'false' }}
-        shell: bash
-        env:
-          TOKEN: ${{ secrets.SUBMODULES_PAT || secrets.GITHUB_TOKEN }}
-        run: |
-          git config --global url."https://x-access-token:${TOKEN}@github.com/".insteadOf "https://github.com/"
-          git submodule update --init --depth=1 ${{ inputs.submodules == 'recursive' && '--recursive' || '' }}
+          submodules: ${{ inputs.submodules }}
 
       - name: Load Inputs from YAML
         id: load-init-inputs
@@ -165,10 +142,11 @@ jobs:
         with:
           dockerhub_project: ${{ env.dockerhub_project }}
           app_name: ${{ matrix.app.name }}
+          image_prefix: ${{ env.image_prefix }}
           version: ${{ needs.define-matrix.outputs.primary_version }}
           docker_username: ${{ env.ARC_DOCKER_USERNAME }}
           docker_password: ${{ env.ARC_DOCKER_PASSWORD }}
-          dockerfile: ${{ github.repository == 'HerodotusDev/backend' && 'storage-proofs' || matrix.app.dockerfile }}
+          dockerfile: ${{ matrix.app.dockerfile }}
           checkout_token: ${{ secrets.SUBMODULES_PAT }}
           submodules: ${{ inputs.submodules }}
 
@@ -176,21 +154,11 @@ jobs:
     needs: [define-matrix, build-and-push-image]
     runs-on: gcp-arc-runners
     steps:
-      - name: Checkout Caller Repository
-        uses: actions/checkout@v4
+      - name: Checkout caller repo
+        uses: HerodotusDev/cicd/.github/actions/checkout-repo@main
         with:
-          repository: ${{ github.repository }}
-          ref: ${{ github.ref }}
           token: ${{ secrets.SUBMODULES_PAT || secrets.GITHUB_TOKEN }}
-
-      - name: Fetch submodules
-        if: inputs.submodules != 'false'
-        shell: bash
-        env:
-          TOKEN: ${{ secrets.SUBMODULES_PAT || secrets.GITHUB_TOKEN }}
-        run: |
-          git config --global url."https://x-access-token:${TOKEN}@github.com/".insteadOf "https://github.com/"
-          git submodule update --init --depth=1 ${{ inputs.submodules == 'recursive' && '--recursive' || '' }}
+          submodules: ${{ inputs.submodules }}
 
       - name: Load Inputs from YAML
         id: load-inputs
@@ -215,22 +183,12 @@ jobs:
         if: ${{ matrix.app.name == '__no_init__' }}
         run: echo "No init pods requested. Skipping deploy-init-pods job."
 
-      - name: Checkout Caller Repository
+      - name: Checkout caller repo
         if: ${{ matrix.app.name != '__no_init__' }}
-        uses: actions/checkout@v4
+        uses: HerodotusDev/cicd/.github/actions/checkout-repo@main
         with:
-          repository: ${{ github.repository }}
-          ref: ${{ github.ref }}
           token: ${{ secrets.SUBMODULES_PAT || secrets.GITHUB_TOKEN }}
-
-      - name: Fetch submodules
-        if: ${{ matrix.app.name != '__no_init__' && inputs.submodules != 'false' }}
-        shell: bash
-        env:
-          TOKEN: ${{ secrets.SUBMODULES_PAT || secrets.GITHUB_TOKEN }}
-        run: |
-          git config --global url."https://x-access-token:${TOKEN}@github.com/".insteadOf "https://github.com/"
-          git submodule update --init --depth=1 ${{ inputs.submodules == 'recursive' && '--recursive' || '' }}
+          submodules: ${{ inputs.submodules }}
 
       - name: Load Inputs from YAML
         id: load-inputs
@@ -247,6 +205,7 @@ jobs:
           pod_manifest: ./k8s/${{ env.k8s_env }}/${{ matrix.app.name }}-pod.yaml
           rollout_timeout: ${{ env.rollout_timeout }}
           image_tag: ${{ needs.define-matrix.outputs.primary_version }}
+          image_prefix: ${{ env.image_prefix }}
           dockerhub_project: ${{ env.dockerhub_project }}
           app_name: ${{ matrix.app.name }}
           image_name: ${{ matrix.app.image }}
@@ -260,21 +219,11 @@ jobs:
     outputs:
       config_changed: ${{ steps.pull_config.outputs.config_changed == 'true' || steps.ensure_configmap.outputs.config_changed == 'true' }}
     steps:
-      - name: Checkout Caller Repository
-        uses: actions/checkout@v4
+      - name: Checkout caller repo
+        uses: HerodotusDev/cicd/.github/actions/checkout-repo@main
         with:
-          repository: ${{ github.repository }}
-          ref: ${{ github.ref }}
           token: ${{ secrets.SUBMODULES_PAT || secrets.GITHUB_TOKEN }}
-
-      - name: Fetch submodules
-        if: inputs.submodules != 'false'
-        shell: bash
-        env:
-          TOKEN: ${{ secrets.SUBMODULES_PAT || secrets.GITHUB_TOKEN }}
-        run: |
-          git config --global url."https://x-access-token:${TOKEN}@github.com/".insteadOf "https://github.com/"
-          git submodule update --init --depth=1 ${{ inputs.submodules == 'recursive' && '--recursive' || '' }}
+          submodules: ${{ inputs.submodules }}
 
       - name: Load Inputs from YAML
         id: load-inputs
@@ -290,7 +239,7 @@ jobs:
           app_name: ${{ matrix.app.name }}
           k8s_env: ${{ env.k8s_env }}
 
-      - name: Pull  config from etcd
+      - name: Pull config from etcd
         id: pull_config
         uses: HerodotusDev/cicd/.github/actions/pull-etcd-config@main
         with:
@@ -309,6 +258,7 @@ jobs:
           ingress_file: ./k8s/${{ env.k8s_env }}/${{ matrix.app.manifest_name }}-ingress.yaml
           rollout_timeout: ${{ env.rollout_timeout }}
           image_tag: ${{ fromJson(needs.define-matrix.outputs.app_versions)[matrix.app.name] }}
+          image_prefix: ${{ env.image_prefix }}
           dockerhub_project: ${{ env.dockerhub_project }}
           app_name: ${{ matrix.app.name }}
           config_changed: ${{ steps.pull_config.outputs.config_changed == 'true' || steps.ensure_configmap.outputs.config_changed == 'true' }}

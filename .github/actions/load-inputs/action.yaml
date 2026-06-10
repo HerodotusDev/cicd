@@ -18,6 +18,23 @@ outputs:
 runs:
   using: "composite"
   steps:
+    - name: Ensure yq
+      shell: bash
+      run: |
+        set -euo pipefail
+        if command -v yq >/dev/null 2>&1; then
+          echo "yq already present: $(yq --version)"
+          exit 0
+        fi
+        YQ_VERSION="v4.44.3"
+        ARCH=$(uname -m)
+        case "$ARCH" in x86_64) ARCH=amd64;; aarch64|arm64) ARCH=arm64;; esac
+        mkdir -p "$RUNNER_TEMP/bin"
+        curl -fsSL "https://github.com/mikefarah/yq/releases/download/${YQ_VERSION}/yq_linux_${ARCH}" -o "$RUNNER_TEMP/bin/yq"
+        chmod +x "$RUNNER_TEMP/bin/yq"
+        echo "$RUNNER_TEMP/bin" >> "$GITHUB_PATH"
+        "$RUNNER_TEMP/bin/yq" --version
+
     - name: Load Inputs and Set Environment Variables
       id: parse-inputs
       shell: bash
@@ -35,13 +52,20 @@ runs:
     - name: Overwrite envs
       shell: bash
       run: |
-        if [ "${GITHUB_REF_NAME}" = "gcp-develop" ] || [ "${GITHUB_REF_NAME}" = "develop" ]; then
+        # Single source of truth for branch -> environment + image prefix.
+        # Consumed downstream as env.k8s_env, env.namespace and env.image_prefix.
+        # Default to the staging image prefix; only main builds and deploys
+        # unprefixed (prod) images.
+        image_prefix="stg-"
+        if [ "${GITHUB_REF_NAME}" = "develop" ]; then
           echo "namespace=stg-${{env.namespace}}" >> $GITHUB_ENV
           echo "k8s_env=stg" >> $GITHUB_ENV
-        elif [ "${GITHUB_REF_NAME}" = "gcp-main" ] || [ "${GITHUB_REF_NAME}" = "main" ]; then
+        elif [ "${GITHUB_REF_NAME}" = "main" ]; then
           echo "namespace=prod-${namespace}" >> $GITHUB_ENV
           echo "k8s_env=prod" >> $GITHUB_ENV
+          image_prefix=""
         fi
+        echo "image_prefix=${image_prefix}" >> $GITHUB_ENV
 
         repo_name=$(basename "$GITHUB_REPOSITORY")
         echo "repo_name=$repo_name" >> $GITHUB_ENV
