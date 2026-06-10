@@ -1,0 +1,31 @@
+name: "Checkout caller repo"
+description: "Checks out the caller repository and fetches submodules per the given mode. Factors out the boilerplate repeated across every job in build-and-deploy."
+
+inputs:
+  token:
+    description: "Token for checkout + submodule fetch (SUBMODULES_PAT for private submodules, else GITHUB_TOKEN)."
+    required: false
+    default: ""
+  submodules:
+    description: "Submodule mode: 'true' (direct only, default), 'recursive' (all nested), or 'false' (none)."
+    required: false
+    default: "true"
+
+runs:
+  using: "composite"
+  steps:
+    - name: Checkout caller repository
+      uses: actions/checkout@v4
+      with:
+        repository: ${{ github.repository }}
+        ref: ${{ github.ref }}
+        token: ${{ inputs.token || github.token }}
+
+    - name: Fetch submodules
+      if: inputs.submodules != 'false'
+      shell: bash
+      env:
+        TOKEN: ${{ inputs.token || github.token }}
+      run: |
+        git config --global url."https://x-access-token:${TOKEN}@github.com/".insteadOf "https://github.com/"
+        git submodule update --init --depth=1 ${{ inputs.submodules == 'recursive' && '--recursive' || '' }}

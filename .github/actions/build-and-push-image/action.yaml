@@ -8,6 +8,10 @@ inputs:
   app_name:
     description: "The application name to form the image name."
     required: true
+  image_prefix:
+    description: "Image name prefix for the target environment ('stg-' or ''). Derived once in load-inputs; passed in by the caller."
+    required: false
+    default: ""
   version:
     description: "Version tag to use (e.g. from a previous job output)."
     required: true
@@ -78,16 +82,7 @@ runs:
     - name: Set image
       shell: bash
       run: |
-        BRANCH=${GITHUB_REF#refs/heads/}    # strip off “refs/heads/”
-        PREFIX=""
-        if [[ "$BRANCH" == "gcp-develop" || "$BRANCH" == "develop" ]]; then
-          PREFIX="stg-"
-        elif [[ "$BRANCH" == "gcp-main" || "$BRANCH" == "main" ]]; then
-          PREFIX=""
-        else
-          PREFIX="dev-"
-        fi
-        echo "IMAGE=${{ inputs.dockerhub_project }}/${PREFIX}${{ inputs.app_name }}" >> $GITHUB_ENV
+        echo "IMAGE=${{ inputs.dockerhub_project }}/${{ inputs.image_prefix }}${{ inputs.app_name }}" >> $GITHUB_ENV
 
 
     - name: Check if Docker image exists
@@ -112,22 +107,20 @@ runs:
         endpoint: "dataprocessor/github"
         install: true
 
-    - name: Compute APP_NAME
-      #if: github.repository == 'HerodotusDev/backend'
-      shell: bash
-      env:
-        RAW_APP: ${{ inputs.app_name }}
-      run: |
-        # remove leading "storage-proofs-" if present
-        STRIPPED="${RAW_APP#storage-proofs-}"
-        echo "app_name=$STRIPPED" >> $GITHUB_ENV        
+    - name: Resolve consumer overrides
+      id: overrides
+      uses: HerodotusDev/cicd/.github/actions/resolve-overrides@main
+      with:
+        repository: ${{ github.repository }}
+        app_name: ${{ inputs.app_name }}
+        default_dockerfile: ${{ inputs.dockerfile }}
 
     - name: Build and push Docker image
       uses: docker/build-push-action@v6
       if: ${{ steps.check_image.outputs.image_exists == 'false' }}
       with:
         context: ${{ inputs.context }}
-        file: ./docker/Dockerfile.${{ inputs.dockerfile }}
+        file: ./docker/Dockerfile.${{ steps.overrides.outputs.dockerfile }}
         push: true
         cache-from: type=gha
         cache-to: type=gha,mode=max
@@ -136,4 +129,4 @@ runs:
           ${{ env.IMAGE }}:latest
           ${{ env.IMAGE }}:${{ inputs.version }}
         build-args: |
-          APP_NAME=app-${{ env.app_name }}
+          APP_NAME=${{ steps.overrides.outputs.app_arg }}

@@ -2,12 +2,6 @@
 name: "Deploy on K8s"
 description: "Deploys Kubernetes resources using kubectl."
 inputs:
-  service_account_token:
-    description: "Service account token for Kubernetes authentication."
-    required: true
-  cluster_url:
-    description: "Kubernetes API server URL."
-    required: true
   namespace:
     description: "Kubernetes namespace to deploy to."
     required: true
@@ -30,7 +24,11 @@ inputs:
     required: true
   app_name:
     description: "The application name to form the image name."
-    required: true    
+    required: true
+  image_prefix:
+    description: "Image name prefix for the target environment ('stg-' or ''). Derived once in load-inputs; passed in by the caller."
+    required: false
+    default: ""
   config_changed:
     description: "Whether config (secret/configmap) changed and deployment needs restart"
     required: false
@@ -47,10 +45,15 @@ runs:
       with:
         version: "v1.32.0"
 
+    - name: Resolve consumer overrides
+      id: overrides
+      uses: HerodotusDev/cicd/.github/actions/resolve-overrides@main
+      with:
+        app_name: ${{ inputs.app_name }}
 
     - name: Update deployment YAML with image tag
       run: |
-        sed -i "s|<IMAGE>|${{ inputs.dockerhub_project }}/${{ (github.ref_name != 'gcp-main' && github.ref_name != 'main') && 'stg-' || '' }}${{ inputs.app_name }}:${{ inputs.image_tag }}|g" "${{ inputs.deployment_file }}"
+        sed -i "s|<IMAGE>|${{ inputs.dockerhub_project }}/${{ inputs.image_prefix }}${{ inputs.app_name }}:${{ inputs.image_tag }}|g" "${{ inputs.deployment_file }}"
       shell: bash
       
     - name: Deploy Deployment YAML (if exists)
@@ -80,23 +83,28 @@ runs:
 
     - name: Restart Deployment if Config Changed
       if: inputs.config_changed == 'true'
+      shell: bash
+      env:
+        ALSO_RESTART: ${{ steps.overrides.outputs.also_restart }}
       run: |
         echo "Config changed - restarting deployment ${{ inputs.app_name }}..."
         kubectl rollout restart deployment/${{ inputs.app_name }} -n ${{ inputs.namespace }}
-        if [ "${{ inputs.app_name }}" = "atlantic-server" ]; then
-          echo "Also restarting atlantic-workers due to atlantic-server secret change..."
-          kubectl rollout restart deployment/atlantic-workers -n ${{ inputs.namespace }}
-        fi
-      shell: bash
+        IFS=',' read -ra EXTRA <<< "$ALSO_RESTART"
+        for dep in "${EXTRA[@]}"; do
+          [ -z "$dep" ] && continue
+          echo "Also restarting $dep (configured for ${{ inputs.app_name }})..."
+          kubectl rollout restart deployment/"$dep" -n ${{ inputs.namespace }}
+        done
 
     - name: Wait for restart to complete
       if: inputs.config_changed == 'true'
+      shell: bash
+      env:
+        ALSO_RESTART: ${{ steps.overrides.outputs.also_restart }}
       run: |
         kubectl rollout status deployment/"${{ inputs.app_name }}" --namespace "${{ inputs.namespace }}" --timeout=${{ inputs.rollout_timeout }}s
-      shell: bash
-
-    - name: Wait for workers restart to complete
-      if: inputs.config_changed == 'true' && inputs.app_name == 'atlantic-server'
-      run: |
-        kubectl rollout status deployment/atlantic-workers --namespace "${{ inputs.namespace }}" --timeout=${{ inputs.rollout_timeout }}s
-      shell: bash
+        IFS=',' read -ra EXTRA <<< "$ALSO_RESTART"
+        for dep in "${EXTRA[@]}"; do
+          [ -z "$dep" ] && continue
+          kubectl rollout status deployment/"$dep" --namespace "${{ inputs.namespace }}" --timeout=${{ inputs.rollout_timeout }}s
+        done

@@ -26,9 +26,6 @@ inputs:
   app_name:
     description: 'Application name'
     required: true
-  service_account_token:
-    description: "Service account token for Kubernetes authentication."
-    required: true
   k8s_env:
     required: true
     description:  "k8s env"
@@ -47,13 +44,22 @@ outputs:
 runs:
   using: "composite"
   steps:
+    - name: Resolve consumer overrides
+      id: overrides
+      uses: HerodotusDev/cicd/.github/actions/resolve-overrides@main
+      with:
+        namespace: ${{ inputs.namespace }}
+
     - name: Resolve ETCD host
       id: resolve_etcd_host
       shell: bash
+      env:
+        OVERRIDE_HOST: ${{ steps.overrides.outputs.etcd_host }}
+        OVERRIDE_NET: ${{ steps.overrides.outputs.etcd_docker_network }}
       run: |
-        if [ "${{ inputs.namespace }}" = "stg-daloc" ]; then
-          echo "host=http://daloc-etcd.stg-daloc.svc.cluster.local:2379" >> "$GITHUB_OUTPUT"
-          echo "docker_network=host" >> "$GITHUB_OUTPUT"
+        if [ -n "$OVERRIDE_HOST" ]; then
+          echo "host=$OVERRIDE_HOST" >> "$GITHUB_OUTPUT"
+          echo "docker_network=${OVERRIDE_NET:-host}" >> "$GITHUB_OUTPUT"
         else
           echo "host=${{ inputs.etcd_host }}" >> "$GITHUB_OUTPUT"
           echo "docker_network=bridge" >> "$GITHUB_OUTPUT"
