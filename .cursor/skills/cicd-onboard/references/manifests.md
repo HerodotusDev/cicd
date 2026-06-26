@@ -114,6 +114,10 @@ spec:
 
 A new host also needs a public DNS A record pointing at the shared Traefik load-balancer IP (ask infra for the current value). If the target namespace uses a default-deny NetworkPolicy, ingress and the ACME HTTP-01 challenge must be explicitly allowed or the TLS certificate will not issue -- check the namespace policy with infra.
 
+### Geoblocked hosts
+
+Fronted by the geoblock edge LB (Cloud Armor GeoIP)? That host's router needs an origin-lock header rather than a plain `Ingress`. Setup is infra-driven — see the private **k8s** repo (`ansible/playbooks/gcp/GEOBLOCK.md`).
+
 ## Gotchas worth fixing when you template from existing repos
 
 The cicd repo's `examples/k8s/**` (and some live repos) carry patterns worth correcting:

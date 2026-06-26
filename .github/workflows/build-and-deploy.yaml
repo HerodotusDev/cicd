@@ -262,3 +262,4 @@ jobs:
           dockerhub_project: ${{ env.dockerhub_project }}
           app_name: ${{ matrix.app.name }}
           config_changed: ${{ steps.pull_config.outputs.config_changed == 'true' || steps.ensure_configmap.outputs.config_changed == 'true' }}
+          edge_verify_secret: ${{ env.ARC_EDGE_VERIFY_SECRET }}

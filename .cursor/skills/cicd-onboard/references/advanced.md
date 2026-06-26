@@ -42,7 +42,14 @@ There is no separate rollback workflow. To redeploy a specific image version, dr
 
 ## Runner & secret environment (where credentials come from)
 
-The reusable workflow runs on self-hosted runners (`gcp-arc-runners`). Registry and etcd credentials are **provided by the runner environment** as `env.ARC_DOCKER_USERNAME`, `env.ARC_DOCKER_PASSWORD`, `env.ARC_ETCD_USER`, `env.ARC_ETCD_PASSWORD` — a consumer repo does **not** set these. The only secret a consumer may need to pass is `SUBMODULES_PAT` (private submodules). kubectl auth is in-cluster (runner runs inside the cluster); there's no kubeconfig to manage.
+The reusable workflow runs on self-hosted runners (`gcp-arc-runners`) that inject the
+cluster-wide infra credentials it needs as `env.ARC_*` — a consumer repo does **not**
+set these. kubectl auth is in-cluster (the runner runs inside the cluster); there's no
+kubeconfig to manage. The only secret a consumer may need to pass is `SUBMODULES_PAT`
+(private submodules).
+
+> What the runner's `ARC_*` values are, and how they're stored, deployed, and rotated,
+> lives in the **private k8s repo** (`kubernetes/SECRETS.md`).
 
 ## Build-skip & tagging (the parts not covered elsewhere)
 

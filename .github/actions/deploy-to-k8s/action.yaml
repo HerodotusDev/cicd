@@ -33,6 +33,10 @@ inputs:
     description: "Whether config (secret/configmap) changed and deployment needs restart"
     required: false
     default: "false"
+  edge_verify_secret:
+    description: "Geoblock origin-lock secret. If set, replaces the __EDGE_VERIFY_SECRET__ placeholder in the ingress file before apply (no-op when the placeholder is absent). Sourced from the runner env (env.ARC_EDGE_VERIFY_SECRET); never committed to a repo."
+    required: false
+    default: ""
 
 runs:
   using: "composite"
@@ -55,6 +59,17 @@ runs:
       run: |
         sed -i "s|<IMAGE>|${{ inputs.dockerhub_project }}/${{ inputs.image_prefix }}${{ inputs.app_name }}:${{ inputs.image_tag }}|g" "${{ inputs.deployment_file }}"
       shell: bash
+
+    - name: Inject geoblock origin-lock secret into ingress
+      if: ${{ inputs.edge_verify_secret != '' }}
+      shell: bash
+      env:
+        EDGE_VERIFY_SECRET: ${{ inputs.edge_verify_secret }}
+      run: |
+        echo "::add-mask::$EDGE_VERIFY_SECRET"
+        if [ -f "${{ inputs.ingress_file }}" ]; then
+          sed -i "s|__EDGE_VERIFY_SECRET__|${EDGE_VERIFY_SECRET}|g" "${{ inputs.ingress_file }}"
+        fi
       
     - name: Deploy Deployment YAML (if exists)
       run: |
