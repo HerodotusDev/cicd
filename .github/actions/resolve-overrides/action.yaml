@@ -35,6 +35,12 @@ outputs:
   etcd_docker_network:
     description: "docker network for the etcd-pull container when an override applies (empty if none)."
     value: ${{ steps.resolve.outputs.etcd_docker_network }}
+  etcd_user:
+    description: "etcd user override for the namespace (empty if none; caller falls back to default)."
+    value: ${{ steps.resolve.outputs.etcd_user }}
+  etcd_password_env:
+    description: "Name of the env var holding the etcd password for this namespace (empty if none; caller falls back to default)."
+    value: ${{ steps.resolve.outputs.etcd_password_env }}
 
 runs:
   using: "composite"
@@ -66,6 +72,8 @@ runs:
         also_restart=$(yq ".restart_also.\"${APP}\" // [] | join(\",\")" "$f")
         etcd_host=$(yq ".etcd_hosts.\"${NS}\".host // \"\"" "$f")
         etcd_net=$(yq ".etcd_hosts.\"${NS}\".docker_network // \"\"" "$f")
+        etcd_user=$(yq ".etcd_hosts.\"${NS}\".user // \"\"" "$f")
+        etcd_password_env=$(yq ".etcd_hosts.\"${NS}\".password_env // \"\"" "$f")
 
         {
           echo "dockerfile=$dockerfile"
@@ -73,4 +81,6 @@ runs:
           echo "also_restart=$also_restart"
           echo "etcd_host=$etcd_host"
           echo "etcd_docker_network=$etcd_net"
+          echo "etcd_user=$etcd_user"
+          echo "etcd_password_env=$etcd_password_env"
         } >> "$GITHUB_OUTPUT"

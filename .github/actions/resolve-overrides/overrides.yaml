@@ -31,3 +31,5 @@ etcd_hosts:
   stg-daloc:
     host: http://daloc-etcd.stg-daloc.svc.cluster.local:2379
     docker_network: host
+    user: read_user
+    password_env: ARC_DALOC_ETCD_PASSWORD

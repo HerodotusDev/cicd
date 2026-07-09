@@ -56,6 +56,8 @@ runs:
       env:
         OVERRIDE_HOST: ${{ steps.overrides.outputs.etcd_host }}
         OVERRIDE_NET: ${{ steps.overrides.outputs.etcd_docker_network }}
+        OVERRIDE_USER: ${{ steps.overrides.outputs.etcd_user }}
+        OVERRIDE_PASSWORD_ENV: ${{ steps.overrides.outputs.etcd_password_env }}
       run: |
         if [ -n "$OVERRIDE_HOST" ]; then
           echo "host=$OVERRIDE_HOST" >> "$GITHUB_OUTPUT"
@@ -63,6 +65,16 @@ runs:
         else
           echo "host=${{ inputs.etcd_host }}" >> "$GITHUB_OUTPUT"
           echo "docker_network=bridge" >> "$GITHUB_OUTPUT"
+        fi
+        if [ -n "$OVERRIDE_USER" ]; then
+          echo "etcd_user=$OVERRIDE_USER" >> "$GITHUB_OUTPUT"
+        else
+          echo "etcd_user=${{ inputs.etcd_user }}" >> "$GITHUB_OUTPUT"
+        fi
+        if [ -n "$OVERRIDE_PASSWORD_ENV" ]; then
+          echo "etcd_password=${!OVERRIDE_PASSWORD_ENV}" >> "$GITHUB_OUTPUT"
+        else
+          echo "etcd_password=${{ inputs.etcd_password }}" >> "$GITHUB_OUTPUT"
         fi
 
     - name: Pull and Run Secret Preparation Container
@@ -80,8 +92,8 @@ runs:
         fi
         docker run --rm $NETWORK_FLAG \
           -e ETCD_HOST="${{ steps.resolve_etcd_host.outputs.host }}" \
-          -e ETCD_USER="${{ inputs.etcd_user }}" \
-          -e ETCD_PASSWORD="${{ inputs.etcd_password }}" \
+          -e ETCD_USER="${{ steps.resolve_etcd_host.outputs.etcd_user }}" \
+          -e ETCD_PASSWORD="${{ steps.resolve_etcd_host.outputs.etcd_password }}" \
           -e ETCD_KEY="/${{ inputs.etcd_root }}/${{inputs.k8s_env}}/${{ inputs.app_name }}/.env" \
           -e APP_NAME="${{ inputs.app_name }}" \
           -e NAMESPACE="${{ inputs.namespace }}" \
