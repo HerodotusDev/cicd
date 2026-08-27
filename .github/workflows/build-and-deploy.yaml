@@ -106,6 +106,8 @@ jobs:
           checkout_token: ${{ secrets.SUBMODULES_PAT }}
           submodules: ${{ inputs.submodules }}
           build_env_file: ${{ steps.build-env.outputs.env_file }}
+          cache_mode: ${{ matrix.app.cache_mode || 'max' }}
+          cache_scope: ${{ matrix.app.cache_scope || '' }}
 
   build-and-push-init:
     needs: [define-matrix]
@@ -149,6 +151,8 @@ jobs:
           dockerfile: ${{ matrix.app.dockerfile }}
           checkout_token: ${{ secrets.SUBMODULES_PAT }}
           submodules: ${{ inputs.submodules }}
+          cache_mode: ${{ matrix.app.cache_mode || 'max' }}
+          cache_scope: ${{ matrix.app.cache_scope || '' }}
 
   create-git-tag:
     needs: [define-matrix, build-and-push-image]
