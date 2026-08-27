@@ -43,6 +43,8 @@ app_names:
 | `init` | `false` | If true, app is built+run as an init pod (`<name>-pod.yaml`) before main apps; excluded from the main deploy matrix. |
 | `image` | `<name>` | **Init pods only.** Reuse another app's built image instead of building a separate one; when set and ≠ name, the build step is skipped. |
 | `etcd_build_env` | `false` | Pull a `.env` from etcd at **build time** and inject it as `.env.production` into the build context (see config reference). |
+| `cache_mode` | `max` | BuildKit GHA cache export mode passed to `cache-to`: `min` (final image layers only) or `max` (all intermediate stages). |
+| `cache_scope` | *(default BuildKit scope)* | Optional GHA cache scope key. Set per app so matrix builds do not overwrite each other's cache buckets. |
 
 ## Version resolution
 

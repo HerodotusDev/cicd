@@ -45,6 +45,14 @@ inputs:
     description: "Submodule checkout mode: 'true' (direct only, default), 'recursive' (all nested), or 'false' (none)."
     required: false
     default: "true"
+  cache_mode:
+    description: "BuildKit GHA cache export mode: min (final image layers only) or max (all stages)."
+    required: false
+    default: "max"
+  cache_scope:
+    description: "Optional GHA cache scope key. When set, cache-from/to use this scope instead of the default buildkit bucket."
+    required: false
+    default: ""
 
 runs:
   using: "composite"
@@ -120,8 +128,8 @@ runs:
         context: ${{ inputs.context }}
         file: ./docker/Dockerfile.${{ steps.overrides.outputs.dockerfile }}
         push: true
-        cache-from: type=gha
-        cache-to: type=gha,mode=max
+        cache-from: type=gha${{ inputs.cache_scope != '' && format(',scope={0}', inputs.cache_scope) || '' }}
+        cache-to: type=gha,mode=${{ inputs.cache_mode }}${{ inputs.cache_scope != '' && format(',scope={0}', inputs.cache_scope) || '' }}
         network: host
         tags: |
           ${{ env.IMAGE }}:latest
