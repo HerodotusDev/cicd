@@ -33,3 +33,12 @@ etcd_hosts:
     docker_network: host
     user: read_user
     password_env: ARC_DALOC_ETCD_PASSWORD
+  # beta-v2 production namespace: dedicated in-namespace etcd. docker_network
+  # host is required so the etcd-pull container resolves *.svc.cluster.local
+  # (default bridge DNS cannot). Without this entry, prod-daloc deploys would
+  # silently target the shared cluster etcd with the wrong credentials.
+  prod-daloc:
+    host: http://daloc-etcd.prod-daloc.svc.cluster.local:2379
+    docker_network: host
+    user: read_user
+    password_env: ARC_DALOC_PROD_ETCD_PASSWORD
