@@ -8,6 +8,11 @@ on:
         type: string
         required: false
         default: "true"
+      build-strategy:
+        description: "Build execution mode: 'parallel' (default; one matrix job per app) or 'sequential' (one job builds all apps in order inside a single buildx context, so the first build pays for shared compile layers and the rest hit the in-job layer cache)."
+        type: string
+        required: false
+        default: "parallel"
     secrets:
       SUBMODULES_PAT:
         description: "PAT for cloning private submodules. If omitted, submodules are still fetched with GITHUB_TOKEN (works for public submodules)."
@@ -28,6 +33,12 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: HerodotusDev/cicd/.github/actions/guard-branch@main
+
+      - name: Validate build-strategy input
+        if: inputs.build-strategy != 'parallel' && inputs.build-strategy != 'sequential'
+        run: |
+          echo "::error::Invalid build-strategy '${{ inputs.build-strategy }}'. Supported values: 'parallel' (default), 'sequential'."
+          exit 1
 
   define-matrix:
     needs: [guard]
@@ -62,6 +73,7 @@ jobs:
           default_version_key: ${{ env.version_key }}
 
   build-and-push-image:
+    if: inputs.build-strategy != 'sequential'
     needs: [define-matrix]
     runs-on: gcp-arc-runners
     strategy:
@@ -109,6 +121,40 @@ jobs:
           cache_mode: ${{ matrix.app.cache_mode || 'max' }}
           cache_scope: ${{ matrix.app.cache_scope || '' }}
 
+  build-and-push-image-sequential:
+    if: inputs.build-strategy == 'sequential'
+    needs: [define-matrix]
+    runs-on: gcp-arc-runners
+    steps:
+      - name: Checkout caller repo
+        uses: HerodotusDev/cicd/.github/actions/checkout-repo@main
+        with:
+          token: ${{ secrets.SUBMODULES_PAT || secrets.GITHUB_TOKEN }}
+          submodules: ${{ inputs.submodules }}
+
+      - name: Load Inputs from YAML
+        id: load-inputs
+        uses: HerodotusDev/cicd/.github/actions/load-inputs@main
+        with:
+          inputs_file: ${{ env.inputs_files }}
+
+      - name: Build and push all images sequentially
+        uses: HerodotusDev/cicd/.github/actions/build-and-push-image-sequential@main
+        with:
+          dockerhub_project: ${{ env.dockerhub_project }}
+          image_prefix: ${{ env.image_prefix }}
+          matrix_deploy: ${{ needs.define-matrix.outputs.matrix_deploy }}
+          app_versions: ${{ needs.define-matrix.outputs.app_versions }}
+          docker_username: ${{ env.ARC_DOCKER_USERNAME }}
+          docker_password: ${{ env.ARC_DOCKER_PASSWORD }}
+          checkout_token: ${{ secrets.SUBMODULES_PAT }}
+          submodules: ${{ inputs.submodules }}
+          namespace: ${{ env.namespace }}
+          etcd_root: ${{ env.etcd_root || env.repo_name }}
+          etcd_user: ${{ env.ARC_ETCD_USER }}
+          etcd_password: ${{ env.ARC_ETCD_PASSWORD }}
+          k8s_env: ${{ env.k8s_env }}
+
   build-and-push-init:
     needs: [define-matrix]
     runs-on: gcp-arc-runners
@@ -155,7 +201,8 @@ jobs:
           cache_scope: ${{ matrix.app.cache_scope || '' }}
 
   create-git-tag:
-    needs: [define-matrix, build-and-push-image]
+    needs: [define-matrix, build-and-push-image, build-and-push-image-sequential]
+    if: ${{ !cancelled() && needs.define-matrix.result == 'success' && (needs.build-and-push-image.result == 'success' || needs.build-and-push-image-sequential.result == 'success') }}
     runs-on: gcp-arc-runners
     steps:
       - name: Checkout caller repo
@@ -177,7 +224,8 @@ jobs:
           token: ${{ secrets.GITHUB_TOKEN }}
 
   deploy-init-pods:
-    needs: [define-matrix, create-git-tag, build-and-push-image, build-and-push-init]
+    needs: [define-matrix, create-git-tag, build-and-push-image, build-and-push-image-sequential, build-and-push-init]
+    if: ${{ !cancelled() && needs.define-matrix.result == 'success' && needs.create-git-tag.result == 'success' && (needs.build-and-push-image.result == 'success' || needs.build-and-push-image-sequential.result == 'success') && needs.build-and-push-init.result == 'success' }}
     runs-on: gcp-arc-runners
     strategy:
       matrix:
@@ -215,7 +263,8 @@ jobs:
           image_name: ${{ matrix.app.image }}
 
   deploy:
-    needs: [define-matrix, create-git-tag, build-and-push-image, deploy-init-pods]
+    needs: [define-matrix, create-git-tag, build-and-push-image, build-and-push-image-sequential, deploy-init-pods]
+    if: ${{ !cancelled() && needs.define-matrix.result == 'success' && needs.create-git-tag.result == 'success' && (needs.build-and-push-image.result == 'success' || needs.build-and-push-image-sequential.result == 'success') && needs.deploy-init-pods.result == 'success' }}
     runs-on: gcp-arc-runners
     strategy:
       matrix:

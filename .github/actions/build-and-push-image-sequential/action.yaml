@@ -1,0 +1,88 @@
+---
+name: "Build and Push Images (Sequential)"
+description: "Builds every deploy app one-by-one inside a single buildx context: the first build pays for shared compile layers (e.g. a workspace-wide compile) and the rest hit the in-job builder cache. Per-app behavior mirrors .github/actions/build-and-push-image (checkout/submodules, registry login, tag-exists skip, resolve-overrides, etcd build-env, gha cache config, tags, APP_NAME build-arg); failures stop the loop immediately."
+
+inputs:
+  dockerhub_project:
+    description: "The Docker Hub project (or organization/repository prefix) (e.g. myorg)"
+    required: true
+  image_prefix:
+    description: "Image name prefix for the target environment ('stg-' or '')."
+    required: false
+    default: ""
+  matrix_deploy:
+    description: "JSON array of deploy apps (define-matrix matrix_deploy output)."
+    required: true
+  app_versions:
+    description: "JSON map of app name to resolved version (define-matrix app_versions output)."
+    required: true
+  docker_username:
+    description: "Dockerhub login"
+    required: true
+  docker_password:
+    description: "Dockerhub login"
+    required: true
+  checkout_token:
+    description: "Token for checkout (PAT for private submodules, defaults to GITHUB_TOKEN)."
+    required: false
+    default: ""
+  submodules:
+    description: "Submodule checkout mode: 'true' (direct only, default), 'recursive' (all nested), or 'false' (none)."
+    required: false
+    default: "true"
+  namespace:
+    description: "Kubernetes namespace (post stg-/prod- rewrite; used to resolve etcd host)."
+    required: true
+  etcd_root:
+    description: "ETCD root path for build-env keys."
+    required: true
+  etcd_user:
+    description: "ETCD username."
+    required: true
+  etcd_password:
+    description: "ETCD password."
+    required: true
+  k8s_env:
+    description: "Kubernetes environment (stg / prod)."
+    required: true
+
+runs:
+  using: "composite"
+  steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      with:
+        token: ${{ inputs.checkout_token || github.token }}
+
+    - name: Fetch submodules
+      if: inputs.submodules != 'false'
+      shell: bash
+      run: |
+        git config --global url."https://x-access-token:${{ inputs.checkout_token || github.token }}@github.com/".insteadOf "https://github.com/"
+        git submodule update --init --depth=1 ${{ inputs.submodules == 'recursive' && '--recursive' || '' }}
+
+    - name: Log in to Docker Registry
+      uses: docker/login-action@v3
+      with:
+        username: ${{ inputs.docker_username }}
+        password: ${{ inputs.docker_password }}
+
+    - name: Set up Docker Buildx
+      uses: docker/setup-buildx-action@v3
+      with:
+        install: true
+
+    - name: Build and push images
+      shell: bash
+      env:
+        DOCKERHUB_PROJECT: ${{ inputs.dockerhub_project }}
+        IMAGE_PREFIX: ${{ inputs.image_prefix }}
+        MATRIX_DEPLOY: ${{ inputs.matrix_deploy }}
+        APP_VERSIONS: ${{ inputs.app_versions }}
+        NAMESPACE: ${{ inputs.namespace }}
+        ETCD_ROOT: ${{ inputs.etcd_root }}
+        ETCD_USER: ${{ inputs.etcd_user }}
+        ETCD_PASSWORD: ${{ inputs.etcd_password }}
+        K8S_ENV: ${{ inputs.k8s_env }}
+      run: |
+        bash "${GITHUB_ACTION_PATH}/build_sequential.sh"
