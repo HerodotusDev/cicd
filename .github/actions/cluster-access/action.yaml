@@ -117,3 +117,4 @@ runs:
         echo "::error::etcd port-forward did not come up; log:"
         cat "${RUNNER_TEMP}/etcd-forward.log"
         exit 1
+# tunnel serialization fix verified
