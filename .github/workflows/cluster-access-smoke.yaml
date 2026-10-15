@@ -91,5 +91,3 @@ jobs:
         shell: bash
         env:
           ETCD_PASSWORD: ${{ env.ETCD_PASSWORD }}
-# re-run trigger after org secrets setup
-# re-trigger smoke with org secrets visible to cicd
