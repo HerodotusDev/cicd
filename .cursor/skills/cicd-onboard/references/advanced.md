@@ -11,13 +11,10 @@ Mark an app `init: true` in `cicd-inputs.yaml`. The pipeline builds it (or reuse
 
 Typical use: DB migrations that must finish before the server rolls out.
 
-## GPU workloads
+## GPU workloads (removed)
 
-Full guide lives in the cicd repo at `examples/gpu.md`. Essentials:
-
-- Deployment pod spec needs `runtimeClassName: nvidia`, a toleration for the `kind=gpu-worker:NoSchedule` taint, and `resources.limits."nvidia.com/gpu": "1"`.
-- Dockerfile: base on `nvidia/cuda:<ver>-{base|runtime|devel}-ubuntu22.04`; **never install NVIDIA drivers** (injected at runtime by the RuntimeClass).
-- GPU nodes are MIG-managed and may be scaled to zero; the first GPU pod can take minutes while a node spins up. Cluster-side scaling is outside this skill.
+The home cluster has no GPU nodes; the old GCP GPU guide lives only on the
+frozen `gcp-main` branch of the k8s repo.
 
 ## Submodules
 
@@ -42,19 +39,22 @@ There is no separate rollback workflow. To redeploy a specific image version, dr
 
 ## Runner & secret environment (where credentials come from)
 
-The reusable workflow runs on self-hosted runners (`gcp-arc-runners`) that inject the
-cluster-wide infra credentials it needs as `env.ARC_*` — a consumer repo does **not**
-set these. kubectl auth is in-cluster (the runner runs inside the cluster); there's no
-kubeconfig to manage. The only secret a consumer may need to pass is `SUBMODULES_PAT`
-(private submodules).
+Jobs run on GitHub-hosted runners (`ubuntu-latest`). Cluster access is set up
+per job by the **`cluster-access` composite action** (first step of every
+kubectl/etcd-touching job):
 
-> What the runner's `ARC_*` values are, and how they're stored, deployed, and rotated,
-> lives in the **private k8s repo** (`kubernetes/SECRETS.md`).
+- `WG_CONFIG` + `DEPLOYER_KUBECONFIG` are **org secrets** (shared, selected repos) —
+  a consumer repo does not create or pass them; the reusable workflow references
+  them directly.
+- ghcr login uses the caller's `GITHUB_TOKEN` — consumer workflows need
+  `packages: write`.
+- etcd credentials are read at deploy time from the in-namespace `daloc-etcd`
+  secret and exported as `ETCD_USER`/`ETCD_PASSWORD` for that job only; nothing
+  etcd-related is stored in GitHub.
 
 ## Build-skip & tagging (the parts not covered elsewhere)
 
 - The build is **skipped if `<image>:<version>` already exists** in the registry (`docker manifest inspect`). Bumping the version file is the only thing that forces a rebuild — re-running the same version reuses the existing image.
-- At build time, branches other than main/develop get a `dev-` image prefix (the deploy step only ever uses `stg-`/none, so dev images are build-only artifacts).
 - The repo is git-tagged with the first app's resolved version, skipped if that tag already exists.
 
 ## Troubleshooting
@@ -63,10 +63,11 @@ kubeconfig to manage. The only secret a consumer may need to pass is `SUBMODULES
 |---------|--------------|
 | Job fails at "Wait for deployment rollout" but apply succeeded | Deployment `metadata.name` ≠ app `name`; or the new pods crash/aren't ready within `rollout_timeout` (default 500s). |
 | Image didn't update after merge | Version file not bumped → existing tag reused, build skipped. Bump the version. |
-| `ImagePullBackOff` | `dockerhub-secret` missing in the namespace, or pushing to the wrong env prefix (deployed from `develop` expects `stg-<app>`). |
+| `ImagePullBackOff` | `ghcr-pull` secret missing in the namespace, or the PAT behind it lost access to the package. |
 | Secret not present / app missing env | etcd key absent at `/<etcd_root>/<env>/<etcd_name>/.env`, or `etcd_root`/`etcd_name` mismatch. The pull step warns and continues. |
 | Config edited but pods didn't restart | Hash unchanged (no real content change), or the configmap dir/etcd key wasn't actually updated. |
-| Ingress 404/502 / cert not issuing | Ingress backend port ≠ Service port; namespace missing its DNS A record; or a default-deny NetworkPolicy blocking ingress / the ACME HTTP-01 challenge (see manifests.md ingress notes). |
+| Ingress 404/502 / cert not issuing | Ingress backend port ≠ Service port; Cloudflare DNS missing/proxied wrong; or a default-deny NetworkPolicy blocking ingress / the ACME HTTP-01 challenge (see manifests.md ingress notes). |
+| Tunnel/port-forward failures (cluster-access step) | WG peer disabled on OPNsense, home internet down, or `daloc-etcd` not running in the namespace — check the etcd-forward log in the step output. |
 | Run didn't trigger | Pushed to a non-`main`/`develop` branch, or commit message contains `[ci skip]`. |
 | Init pod hangs the pipeline | Init manifest is a long-running Deployment/Pod instead of a job that reaches `Succeeded`. |
 

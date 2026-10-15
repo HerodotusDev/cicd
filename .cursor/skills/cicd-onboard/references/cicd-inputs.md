@@ -6,11 +6,11 @@ Parsed by the `load-inputs` action (a hand-rolled YAML→env reader, not a full 
 
 | Key | Required | Default | Notes |
 |-----|----------|---------|-------|
-| `namespace` | ✅ | — | Base namespace. Rewritten to `stg-<namespace>` on develop, `prod-<namespace>` on main. |
+| `namespace` | ✅ | — | Base namespace. Rewritten to `<namespace>-stg` on develop, `<namespace>-prod` on main. |
 | `version_file` | — | `./package.json` | Fallback version source for apps that don't set their own. |
 | `version_key` | — | first `version` field | Dot-path into the version file (e.g. `package.version`, or a TOML `[tool.poetry].version`). |
 | `etcd_root` | — | repo name | Root segment of the etcd key path (`/<etcd_root>/<env>/<app>/.env`). |
-| `dockerhub_project` | — | `dataprocessor` | Registry org/prefix. Workflow-level default; override here if needed. |
+| `registry` | — | `ghcr.io/herodotusdev` | Image repository prefix. Workflow-level default; override here if needed. |
 
 Any other top-level scalar you add also becomes an env var — only add ones the actions actually consume.
 

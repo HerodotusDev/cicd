@@ -3,17 +3,14 @@ apiVersion: networking.k8s.io/v1
 kind: Ingress
 metadata:
   name: example-ingress
+  namespace: example-stg
   annotations:
-    spec.ingressClassName: traefik
-    cert-manager.io/cluster-issuer: letsencrypt-prod
-    traefik.ingress.kubernetes.io/router.middlewares: kube-system-redirect-https@kubernetescrd
+    traefik.ingress.kubernetes.io/router.tls: "true"
+    traefik.ingress.kubernetes.io/router.tls.certresolver: default
 spec:
-  tls:
-    - hosts:
-        - example.api.herodotus.cloud
-      secretName: example-tls
+  ingressClassName: traefik
   rules:
-    - host: example.api.herodotus.cloud
+    - host: example.api.daloc.xyz
       http:
         paths:
           - path: /

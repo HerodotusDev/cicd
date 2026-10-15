@@ -13,7 +13,7 @@ spec:
         app: example
     spec:
       imagePullSecrets:
-        - name: dockerhub-secret    
+        - name: ghcr-pull    
       containers:
         - name: example
           ### placeholder to be set by cicd pipeline

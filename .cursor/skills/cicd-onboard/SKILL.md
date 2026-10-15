@@ -18,21 +18,21 @@ How to add the shared build-and-deploy pipeline to an **app repo**. The heavy li
 `develop`/`main` push (or manual `workflow_dispatch`) triggers the caller's workflow, which calls `HerodotusDev/cicd/.github/workflows/build-and-deploy.yaml@main`. That reusable workflow:
 
 1. **define-matrix** — parses `k8s/cicd-inputs.yaml`, resolves each app's version from its version file, builds the app/deploy/init matrices.
-2. **build-and-push-image** — per app: builds `docker/Dockerfile.<app>`, pushes `dataprocessor/<prefix><app>:<version>` (and `:latest`). **Skips the build if that image:tag already exists** — so deploys are driven by bumping the version file.
+2. **build-and-push-image** — per app: builds `docker/Dockerfile.<app>`, pushes `ghcr.io/herodotusdev/<app>-<env>:<version>` (and `:latest`). **Skips the build if that image:tag already exists** — so deploys are driven by bumping the version file.
 3. **create-git-tag** — tags the repo with the primary (first app's) version if absent.
 4. **build/deploy init pods** — apps marked `init: true` build and run to completion *before* the main rollout.
-5. **deploy** — syncs configmap + etcd secret, sed-replaces `<IMAGE>` in the manifest, `kubectl apply`s deployment + ingress, waits for rollout. If the secret/configmap content changed, it `rollout restart`s the deployment.
+5. **deploy** — opens the WireGuard tunnel (`cluster-access` action), syncs configmap + etcd secret (etcd via port-forward over the tunnel), sed-replaces `<IMAGE>` in the manifest, `kubectl apply`s deployment + ingress, waits for rollout. If the secret/configmap content changed, it `rollout restart`s the deployment.
 
 **Branch → environment mapping** (done by the `load-inputs` action):
 
-| Branch | `k8s_env` | namespace | image prefix |
+| Branch | `k8s_env` | namespace | image suffix |
 |--------|-----------|-----------|--------------|
-| `develop` (or `gcp-develop`) | `stg` | `stg-<namespace>` | `stg-` |
-| `main` (or `gcp-main`) | `prod` | `prod-<namespace>` | *(none)* |
+| `develop` | `stg` | `<namespace>-stg` | `-stg` |
+| `main` | `prod` | `<namespace>-prod` | `-prod` |
 
-Environments are **à la carte**: you create only the `k8s/<env>/` dirs you actually deploy to and wire only the matching branches in your stub's `on.push.branches`. A repo that ships straight to prod uses just `k8s/prod/` and triggers on `main` (this is what the reference `l2-indexer` repo does). Add `develop` + `k8s/stg/` only if you want a staging path.
+Environments are **à la carte**: you create only the `k8s/<env>/` dirs you actually deploy to and wire only the matching branches in your stub's `on.push.branches`. A repo that ships straight to prod uses just `k8s/prod/` and triggers on `main`. Add `develop` + `k8s/stg/` only if you want a staging path.
 
-> **build-and-deploy.yaml has no internal branch guard.** The main/develop restriction comes only from the `on.push.branches` in your stub. The `load-inputs` action rewrites `namespace`/`k8s_env` *only* for main/develop (and the `gcp-` variants); on any other branch `k8s_env` is empty, so manifest paths resolve to `./k8s//…` and break. Don't `workflow_dispatch` this workflow from a feature branch. (The separate `deploy.yaml` *does* enforce main/develop via `guard-branch`.)
+> **build-and-deploy.yaml has no internal branch guard.** The main/develop restriction comes only from the `on.push.branches` in your stub. The `load-inputs` action rewrites `namespace`/`k8s_env` *only* for main/develop; on any other branch `k8s_env` is empty, so manifest paths resolve to `./k8s//…` and break. Don't `workflow_dispatch` this workflow from a feature branch. (The separate `deploy.yaml` *does* enforce main/develop via `guard-branch`.)
 
 ## Onboarding checklist
 
@@ -55,7 +55,7 @@ Run these against the **target app repo** (not the cicd repo). Most paths are co
 
 2. **`k8s/cicd-inputs.yaml`** — the one file you always edit. Minimum:
    ```yaml
-   namespace: myapp          # becomes stg-myapp / prod-myapp
+   namespace: myapp          # becomes myapp-stg / myapp-prod on develop/main
    version_file: ./Cargo.toml   # or ./package.json (default)
    app_names:
      - name: myapp
@@ -70,10 +70,11 @@ Run these against the **target app repo** (not the cicd repo). Most paths are co
 
 6. **Config (if the app needs env/secrets)** — upload the env to etcd (→ `<app>-secret`) and/or drop files in `k8s/<env>/<app>-configmap/`. Wiring, paths, and change-triggered restarts → [references/config.md](references/config.md).
 
-7. **Cluster prerequisites (one-time, manual, outside the repo):**
-   - Create the namespace (`stg-<namespace>` / `prod-<namespace>`) before the first deploy.
-   - Ensure the `dockerhub-secret` image-pull secret exists in that namespace.
-   - For a new ingress host, create the public DNS A record pointing at the shared Traefik load-balancer IP (ask infra for the current value).
+7. **Cluster prerequisites (one-time, mostly org-level):**
+   - Create the namespace (`<namespace>-prod` / `<namespace>-stg`) as the tenant owner, through the capsule proxy — tenant admins cannot create namespaces via plain `kubectl apply`.
+   - Copy the `ghcr-pull` image-pull secret into the namespace (private ghcr images; see the k8s repo `secrets.example/`).
+   - Org secrets `WG_CONFIG` + `DEPLOYER_KUBECONFIG` must exist and cover your repo (tunnel + deployer identity; see the root README).
+   - For a new ingress host: Cloudflare DNS (proxied) → home WAN; Traefik issues the cert on first HTTPS request (`certresolver=default`, no cert-manager).
 
 8. **Push** — `develop` for staging, `main` for production. Watch the Actions run; check job logs before escalating.
 

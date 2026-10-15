@@ -22,10 +22,10 @@ The container image line **must** be the literal string `<IMAGE>`:
 ```yaml
 containers:
   - name: myapp
-    image: <IMAGE>      # sed-replaced at deploy with dataprocessor/<prefix><name>:<version>
+    image: <IMAGE>      # sed-replaced at deploy with ghcr.io/herodotusdev/<app><suffix>:<version>
 ```
 
-The deploy action runs `sed -i "s|<IMAGE>|dataprocessor/<prefix><app>:<tag>|g"` before applying. On `main` there is no prefix (prod image); on `develop` it's `stg-`.
+The deploy action runs `sed -i "s|<IMAGE>|<registry>/<app><suffix>:<tag>|g"` before applying. On `main` the suffix is `-prod`; on `develop` it's `-stg`.
 
 ## Naming rules that must hold
 
@@ -49,7 +49,7 @@ spec:
       labels: { app: myapp }
     spec:
       imagePullSecrets:
-        - name: dockerhub-secret   # must pre-exist in the namespace
+        - name: ghcr-pull           # must pre-exist in the namespace (see k8s repo secrets.example/)
       containers:
         - name: myapp
           image: <IMAGE>
@@ -85,22 +85,23 @@ Need persistence? Add a PVC with `storageClassName: lh-common` (the cluster's de
 
 ## Ingress template (public-facing apps)
 
+TLS is Traefik ACME (`certresolver=default`, HTTP-01) — the cert is issued on
+the first HTTPS request. No cert-manager annotations; no cert `secretName`
+needed. DNS must point the host (Cloudflare, proxied) at the home WAN.
+
 ```yaml
 apiVersion: networking.k8s.io/v1
 kind: Ingress
 metadata:
   name: myapp-ingress
+  namespace: myapp-prod
   annotations:
-    cert-manager.io/cluster-issuer: letsencrypt-prod
-    # optional: 308 HTTP→HTTPS redirect. Omit if you don't need it (the reference repo does).
-    traefik.ingress.kubernetes.io/router.middlewares: kube-system-redirect-https@kubernetescrd
+    traefik.ingress.kubernetes.io/router.tls: "true"
+    traefik.ingress.kubernetes.io/router.tls.certresolver: default
 spec:
   ingressClassName: traefik
-  tls:
-    - hosts: [myapp.api.herodotus.cloud]
-      secretName: myapp-tls
   rules:
-    - host: myapp.api.herodotus.cloud
+    - host: myapp.example.daloc.xyz
       http:
         paths:
           - path: /
@@ -112,11 +113,7 @@ spec:
                   number: 8040     # MUST match the Service port
 ```
 
-A new host also needs a public DNS A record pointing at the shared Traefik load-balancer IP (ask infra for the current value). If the target namespace uses a default-deny NetworkPolicy, ingress and the ACME HTTP-01 challenge must be explicitly allowed or the TLS certificate will not issue -- check the namespace policy with infra.
-
-### Geoblocked hosts
-
-Fronted by the geoblock edge LB (Cloud Armor GeoIP)? That host's router needs an origin-lock header rather than a plain `Ingress`. Setup is infra-driven — see the private **k8s** repo (`ansible/playbooks/gcp/GEOBLOCK.md`).
+A new host also needs Cloudflare DNS (proxied, orange) pointing at the home WAN — Traefik then issues the LE cert on the first HTTPS request. If the target namespace uses a default-deny NetworkPolicy, ingress and the ACME HTTP-01 challenge must be explicitly allowed or the TLS certificate will not issue -- check the namespace policy.
 
 ## Gotchas worth fixing when you template from existing repos
 

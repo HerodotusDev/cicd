@@ -4,7 +4,7 @@ Two independent mechanisms feed config into a deployment. Both compute a content
 
 ## etcd → `<app>-secret`
 
-Runtime secrets/env live in the team's external config store, **not** in the repo. At deploy time the pipeline reads each app's config from the key:
+Runtime secrets/env live in **etcd in the deploy namespace** (`daloc-etcd`, single instance), **not** in the repo. At deploy time the pipeline reads each app's config from the key:
 
 ```
 /<etcd_root>/<k8s_env>/<etcd_name>/.env
@@ -14,7 +14,7 @@ Runtime secrets/env live in the team's external config store, **not** in the rep
 - `k8s_env` = `stg` or `prod` (from the branch).
 - `etcd_name` = the app's `etcd_name` field, defaulting to its `name`.
 
-> Populating that key is done out-of-band with the team's internal config-store tooling. That procedure is **intentionally not documented here** (this repo is public) — get it from internal docs / a teammate. This skill only covers the deploy-side contract: which key the pipeline reads and what it does with it.
+> Populating that key is done out-of-band (etcdctl against the in-namespace etcd, or restored from plan-01 backups during migration). The procedure is **intentionally not documented here** (this repo is public) — get it from internal docs / a teammate. This skill only covers the deploy-side contract: which key the pipeline reads and what it does with it.
 
 The `pull-etcd-config` action fetches that key and `kubectl apply`s it as a Secret named `<app>-secret` (annotated with a `secret-hash`). Mount it in the Deployment:
 
@@ -25,7 +25,7 @@ envFrom:
 ```
 
 - If the key is **absent**, the step warns and skips (no secret, no failure) — fine for apps with no secrets.
-- The store endpoint is resolved by the pipeline (per namespace); you don't configure it from the app repo.
+- The store endpoint is resolved by the pipeline (per namespace, over the WireGuard tunnel via port-forward); you don't configure it from the app repo.
 - Changed secret content → `rollout restart`. Special case in the deploy action: restarting `atlantic-server` also restarts `atlantic-workers`.
 
 The `.env` is plain `KEY=VALUE` lines, e.g.:

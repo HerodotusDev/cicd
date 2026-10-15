@@ -1,7 +1,7 @@
 # Sample cicd-inputs.yaml.
 # Every key becomes an env var for the workflow; comment lines list defaults when omitted.
 
-namespace: example                  # required. loader rewrites to stg-/prod-<namespace> on develop/main branches.
+namespace: example                  # required. loader rewrites to <namespace>-stg / <namespace>-prod on develop/main.
 version_file: ./package.json        # optional. defaults to workflow env.version_file (./package.json).
 # version_key: package.version      # optional. defaults to first "version" field when omitted.
 # etcd_root: example                # optional. defaults to repo name when omitted.
