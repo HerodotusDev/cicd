@@ -91,3 +91,5 @@ jobs:
         shell: bash
         env:
           ETCD_PASSWORD: ${{ env.ETCD_PASSWORD }}
+
+<!-- smoke: re-run after org secrets setup -->
