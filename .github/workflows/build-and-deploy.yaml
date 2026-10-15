@@ -23,16 +23,18 @@ env:
   version_file: ./package.json
   version_key:
   inputs_files: ./k8s/cicd-inputs.yaml
-  dockerhub_project: dataprocessor
+  registry: ghcr.io/herodotusdev
+  registry_host: ghcr.io
 
 permissions:
   contents: write
+  packages: write
 
 jobs:
   guard:
     runs-on: ubuntu-latest
     steps:
-      - uses: HerodotusDev/cicd/.github/actions/guard-branch@main
+      - uses: HerodotusDev/cicd/.github/actions/guard-branch@new-main
 
       - name: Validate build-strategy input
         if: inputs.build-strategy != 'parallel' && inputs.build-strategy != 'sequential'
@@ -42,7 +44,7 @@ jobs:
 
   define-matrix:
     needs: [guard]
-    runs-on: gcp-arc-runners
+    runs-on: ubuntu-latest
     outputs:
       matrix_apps: ${{ steps.build-matrix.outputs.matrix_apps }}
       matrix_deploy: ${{ steps.build-matrix.outputs.matrix_deploy }}
@@ -52,20 +54,20 @@ jobs:
       unique_versions: ${{ steps.build-matrix.outputs.unique_versions }}
     steps:
       - name: Checkout caller repo
-        uses: HerodotusDev/cicd/.github/actions/checkout-repo@main
+        uses: HerodotusDev/cicd/.github/actions/checkout-repo@new-main
         with:
           token: ${{ secrets.SUBMODULES_PAT || secrets.GITHUB_TOKEN }}
           submodules: ${{ inputs.submodules }}
 
       - name: Load Inputs from YAML
         id: load-inputs
-        uses: HerodotusDev/cicd/.github/actions/load-inputs@main
+        uses: HerodotusDev/cicd/.github/actions/load-inputs@new-main
         with:
           inputs_file: ${{ env.inputs_files }}
 
       - name: Build app matrix metadata
         id: build-matrix
-        uses: HerodotusDev/cicd/.github/actions/build-matrix@main
+        uses: HerodotusDev/cicd/.github/actions/build-matrix@new-main
         with:
           app_matrix: ${{ steps.load-inputs.outputs.app_matrix }}
           app_names: ${{ steps.load-inputs.outputs.app_names }}
@@ -75,44 +77,54 @@ jobs:
   build-and-push-image:
     if: inputs.build-strategy != 'sequential'
     needs: [define-matrix]
-    runs-on: gcp-arc-runners
+    runs-on: ubuntu-latest
     strategy:
       matrix:
         app: ${{ fromJson(needs.define-matrix.outputs.matrix_deploy) }}
     steps:
       - name: Checkout caller repo
-        uses: HerodotusDev/cicd/.github/actions/checkout-repo@main
+        uses: HerodotusDev/cicd/.github/actions/checkout-repo@new-main
         with:
           token: ${{ secrets.SUBMODULES_PAT || secrets.GITHUB_TOKEN }}
           submodules: ${{ inputs.submodules }}
 
       - name: Load Inputs from YAML
         id: load-inputs
-        uses: HerodotusDev/cicd/.github/actions/load-inputs@main
+        uses: HerodotusDev/cicd/.github/actions/load-inputs@new-main
         with:
           inputs_file: ${{ env.inputs_files }}
+
+      - name: Cluster access (etcd over tunnel)
+        if: matrix.app.etcd_build_env == true
+        uses: HerodotusDev/cicd/.github/actions/cluster-access@new-main
+        with:
+          wg_config: ${{ secrets.WG_CONFIG }}
+          deployer_kubeconfig: ${{ secrets.DEPLOYER_KUBECONFIG }}
+          namespace: ${{ env.namespace }}
+          etcd_forward: true
 
       - name: Pull build-time .env from ETCD
         id: build-env
         if: matrix.app.etcd_build_env == true
-        uses: HerodotusDev/cicd/.github/actions/pull-etcd-build-env@main
+        uses: HerodotusDev/cicd/.github/actions/pull-etcd-build-env@new-main
         with:
           namespace: ${{ env.namespace }}
           app_name: ${{ matrix.app.etcd_name || matrix.app.name }}
           etcd_root: ${{ env.etcd_root || env.repo_name }}
-          etcd_user: ${{ env.ARC_ETCD_USER }}
-          etcd_password: ${{ env.ARC_ETCD_PASSWORD }}
+          etcd_user: ${{ env.ETCD_USER }}
+          etcd_password: ${{ env.ETCD_PASSWORD }}
           k8s_env: ${{ env.k8s_env }}
 
       - name: Build and push image
-        uses: HerodotusDev/cicd/.github/actions/build-and-push-image@main
+        uses: HerodotusDev/cicd/.github/actions/build-and-push-image@new-main
         with:
-          dockerhub_project: ${{ env.dockerhub_project }}
+          registry: ${{ env.registry }}
+          registry_host: ${{ env.registry_host }}
           app_name: ${{ matrix.app.name }}
-          image_prefix: ${{ env.image_prefix }}
+          image_suffix: ${{ env.image_suffix }}
           version: ${{ fromJson(needs.define-matrix.outputs.app_versions)[matrix.app.name] }}
-          docker_username: ${{ env.ARC_DOCKER_USERNAME }}
-          docker_password: ${{ env.ARC_DOCKER_PASSWORD }}
+          registry_username: ${{ github.actor }}
+          registry_password: ${{ github.token }}
           dockerfile: ${{ matrix.app.dockerfile }}
           context: ${{ matrix.app.context }}
           checkout_token: ${{ secrets.SUBMODULES_PAT }}
@@ -124,40 +136,57 @@ jobs:
   build-and-push-image-sequential:
     if: inputs.build-strategy == 'sequential'
     needs: [define-matrix]
-    runs-on: gcp-arc-runners
+    runs-on: ubuntu-latest
     steps:
       - name: Checkout caller repo
-        uses: HerodotusDev/cicd/.github/actions/checkout-repo@main
+        uses: HerodotusDev/cicd/.github/actions/checkout-repo@new-main
         with:
           token: ${{ secrets.SUBMODULES_PAT || secrets.GITHUB_TOKEN }}
           submodules: ${{ inputs.submodules }}
 
       - name: Load Inputs from YAML
         id: load-inputs
-        uses: HerodotusDev/cicd/.github/actions/load-inputs@main
+        uses: HerodotusDev/cicd/.github/actions/load-inputs@new-main
         with:
           inputs_file: ${{ env.inputs_files }}
 
-      - name: Build and push all images sequentially
-        uses: HerodotusDev/cicd/.github/actions/build-and-push-image-sequential@main
+      - name: Detect etcd build-env apps
+        id: detect-etcd
+        run: |
+          needs_etcd=$(printf '%s' '${{ needs.define-matrix.outputs.matrix_deploy }}' | jq '[.[] | select((.etcd_build_env // false) == true)] | length > 0')
+          echo "needs_etcd=${needs_etcd}" >> "$GITHUB_OUTPUT"
+        shell: bash
+
+      - name: Cluster access (etcd over tunnel)
+        if: steps.detect-etcd.outputs.needs_etcd == 'true'
+        uses: HerodotusDev/cicd/.github/actions/cluster-access@new-main
         with:
-          dockerhub_project: ${{ env.dockerhub_project }}
-          image_prefix: ${{ env.image_prefix }}
+          wg_config: ${{ secrets.WG_CONFIG }}
+          deployer_kubeconfig: ${{ secrets.DEPLOYER_KUBECONFIG }}
+          namespace: ${{ env.namespace }}
+          etcd_forward: true
+
+      - name: Build and push all images sequentially
+        uses: HerodotusDev/cicd/.github/actions/build-and-push-image-sequential@new-main
+        with:
+          registry: ${{ env.registry }}
+          registry_host: ${{ env.registry_host }}
+          image_suffix: ${{ env.image_suffix }}
           matrix_deploy: ${{ needs.define-matrix.outputs.matrix_deploy }}
           app_versions: ${{ needs.define-matrix.outputs.app_versions }}
-          docker_username: ${{ env.ARC_DOCKER_USERNAME }}
-          docker_password: ${{ env.ARC_DOCKER_PASSWORD }}
+          registry_username: ${{ github.actor }}
+          registry_password: ${{ github.token }}
           checkout_token: ${{ secrets.SUBMODULES_PAT }}
           submodules: ${{ inputs.submodules }}
           namespace: ${{ env.namespace }}
           etcd_root: ${{ env.etcd_root || env.repo_name }}
-          etcd_user: ${{ env.ARC_ETCD_USER }}
-          etcd_password: ${{ env.ARC_ETCD_PASSWORD }}
+          etcd_user: ${{ env.ETCD_USER }}
+          etcd_password: ${{ env.ETCD_PASSWORD }}
           k8s_env: ${{ env.k8s_env }}
 
   build-and-push-init:
     needs: [define-matrix]
-    runs-on: gcp-arc-runners
+    runs-on: ubuntu-latest
     strategy:
       matrix:
         app: ${{ fromJson(needs.define-matrix.outputs.matrix_init) }}
@@ -172,7 +201,7 @@ jobs:
 
       - name: Checkout caller repo
         if: ${{ matrix.app.name != '__no_init__' && matrix.app.image == matrix.app.name }}
-        uses: HerodotusDev/cicd/.github/actions/checkout-repo@main
+        uses: HerodotusDev/cicd/.github/actions/checkout-repo@new-main
         with:
           token: ${{ secrets.SUBMODULES_PAT || secrets.GITHUB_TOKEN }}
           submodules: ${{ inputs.submodules }}
@@ -180,20 +209,21 @@ jobs:
       - name: Load Inputs from YAML
         id: load-init-inputs
         if: ${{ matrix.app.name != '__no_init__' && matrix.app.image == matrix.app.name }}
-        uses: HerodotusDev/cicd/.github/actions/load-inputs@main
+        uses: HerodotusDev/cicd/.github/actions/load-inputs@new-main
         with:
           inputs_file: ${{ env.inputs_files }}
 
       - name: Build and push init image
         if: ${{ matrix.app.name != '__no_init__' && matrix.app.image == matrix.app.name }}
-        uses: HerodotusDev/cicd/.github/actions/build-and-push-image@main
+        uses: HerodotusDev/cicd/.github/actions/build-and-push-image@new-main
         with:
-          dockerhub_project: ${{ env.dockerhub_project }}
+          registry: ${{ env.registry }}
+          registry_host: ${{ env.registry_host }}
           app_name: ${{ matrix.app.name }}
-          image_prefix: ${{ env.image_prefix }}
+          image_suffix: ${{ env.image_suffix }}
           version: ${{ needs.define-matrix.outputs.primary_version }}
-          docker_username: ${{ env.ARC_DOCKER_USERNAME }}
-          docker_password: ${{ env.ARC_DOCKER_PASSWORD }}
+          registry_username: ${{ github.actor }}
+          registry_password: ${{ github.token }}
           dockerfile: ${{ matrix.app.dockerfile }}
           checkout_token: ${{ secrets.SUBMODULES_PAT }}
           submodules: ${{ inputs.submodules }}
@@ -203,22 +233,22 @@ jobs:
   create-git-tag:
     needs: [define-matrix, build-and-push-image, build-and-push-image-sequential]
     if: ${{ !cancelled() && needs.define-matrix.result == 'success' && (needs.build-and-push-image.result == 'success' || needs.build-and-push-image-sequential.result == 'success') }}
-    runs-on: gcp-arc-runners
+    runs-on: ubuntu-latest
     steps:
       - name: Checkout caller repo
-        uses: HerodotusDev/cicd/.github/actions/checkout-repo@main
+        uses: HerodotusDev/cicd/.github/actions/checkout-repo@new-main
         with:
           token: ${{ secrets.SUBMODULES_PAT || secrets.GITHUB_TOKEN }}
           submodules: ${{ inputs.submodules }}
 
       - name: Load Inputs from YAML
         id: load-inputs
-        uses: HerodotusDev/cicd/.github/actions/load-inputs@main
+        uses: HerodotusDev/cicd/.github/actions/load-inputs@new-main
         with:
           inputs_file: ${{ env.inputs_files }}
 
       - name: Create Git tag
-        uses: HerodotusDev/cicd/.github/actions/create-git-tag@main
+        uses: HerodotusDev/cicd/.github/actions/create-git-tag@new-main
         with:
           tag: ${{ needs.define-matrix.outputs.primary_version }}
           token: ${{ secrets.GITHUB_TOKEN }}
@@ -226,7 +256,7 @@ jobs:
   deploy-init-pods:
     needs: [define-matrix, create-git-tag, build-and-push-image, build-and-push-image-sequential, build-and-push-init]
     if: ${{ !cancelled() && needs.define-matrix.result == 'success' && needs.create-git-tag.result == 'success' && (needs.build-and-push-image.result == 'success' || needs.build-and-push-image-sequential.result == 'success') && needs.build-and-push-init.result == 'success' }}
-    runs-on: gcp-arc-runners
+    runs-on: ubuntu-latest
     strategy:
       matrix:
         app: ${{ fromJson(needs.define-matrix.outputs.matrix_init) }}
@@ -235,9 +265,16 @@ jobs:
         if: ${{ matrix.app.name == '__no_init__' }}
         run: echo "No init pods requested. Skipping deploy-init-pods job."
 
+      - name: Cluster access
+        if: ${{ matrix.app.name != '__no_init__' }}
+        uses: HerodotusDev/cicd/.github/actions/cluster-access@new-main
+        with:
+          wg_config: ${{ secrets.WG_CONFIG }}
+          deployer_kubeconfig: ${{ secrets.DEPLOYER_KUBECONFIG }}
+
       - name: Checkout caller repo
         if: ${{ matrix.app.name != '__no_init__' }}
-        uses: HerodotusDev/cicd/.github/actions/checkout-repo@main
+        uses: HerodotusDev/cicd/.github/actions/checkout-repo@new-main
         with:
           token: ${{ secrets.SUBMODULES_PAT || secrets.GITHUB_TOKEN }}
           submodules: ${{ inputs.submodules }}
@@ -245,27 +282,27 @@ jobs:
       - name: Load Inputs from YAML
         id: load-inputs
         if: ${{ matrix.app.name != '__no_init__' }}
-        uses: HerodotusDev/cicd/.github/actions/load-inputs@main
+        uses: HerodotusDev/cicd/.github/actions/load-inputs@new-main
         with:
           inputs_file: ${{ env.inputs_files }}
 
       - name: Deploy init pod
         if: ${{ matrix.app.name != '__no_init__' }}
-        uses: HerodotusDev/cicd/.github/actions/deploy-init-to-k8s@main
+        uses: HerodotusDev/cicd/.github/actions/deploy-init-to-k8s@new-main
         with:
           namespace: ${{ env.namespace }}
           pod_manifest: ./k8s/${{ env.k8s_env }}/${{ matrix.app.name }}-pod.yaml
           rollout_timeout: ${{ env.rollout_timeout }}
           image_tag: ${{ needs.define-matrix.outputs.primary_version }}
-          image_prefix: ${{ env.image_prefix }}
-          dockerhub_project: ${{ env.dockerhub_project }}
+          image_suffix: ${{ env.image_suffix }}
+          registry: ${{ env.registry }}
           app_name: ${{ matrix.app.name }}
           image_name: ${{ matrix.app.image }}
 
   deploy:
     needs: [define-matrix, create-git-tag, build-and-push-image, build-and-push-image-sequential, deploy-init-pods]
     if: ${{ !cancelled() && needs.define-matrix.result == 'success' && needs.create-git-tag.result == 'success' && (needs.build-and-push-image.result == 'success' || needs.build-and-push-image-sequential.result == 'success') && needs.deploy-init-pods.result == 'success' }}
-    runs-on: gcp-arc-runners
+    runs-on: ubuntu-latest
     strategy:
       matrix:
         app: ${{ fromJson(needs.define-matrix.outputs.matrix_deploy) }}
@@ -273,20 +310,28 @@ jobs:
       config_changed: ${{ steps.pull_config.outputs.config_changed == 'true' || steps.ensure_configmap.outputs.config_changed == 'true' }}
     steps:
       - name: Checkout caller repo
-        uses: HerodotusDev/cicd/.github/actions/checkout-repo@main
+        uses: HerodotusDev/cicd/.github/actions/checkout-repo@new-main
         with:
           token: ${{ secrets.SUBMODULES_PAT || secrets.GITHUB_TOKEN }}
           submodules: ${{ inputs.submodules }}
 
       - name: Load Inputs from YAML
         id: load-inputs
-        uses: HerodotusDev/cicd/.github/actions/load-inputs@main
+        uses: HerodotusDev/cicd/.github/actions/load-inputs@new-main
         with:
           inputs_file: ${{ env.inputs_files }}
 
+      - name: Cluster access (etcd over tunnel)
+        uses: HerodotusDev/cicd/.github/actions/cluster-access@new-main
+        with:
+          wg_config: ${{ secrets.WG_CONFIG }}
+          deployer_kubeconfig: ${{ secrets.DEPLOYER_KUBECONFIG }}
+          namespace: ${{ env.namespace }}
+          etcd_forward: true
+
       - name: Ensure ConfigMap from files
         id: ensure_configmap
-        uses: HerodotusDev/cicd/.github/actions/create-configmap@main
+        uses: HerodotusDev/cicd/.github/actions/create-configmap@new-main
         with:
           namespace: ${{ env.namespace }}
           app_name: ${{ matrix.app.name }}
@@ -294,25 +339,24 @@ jobs:
 
       - name: Pull config from etcd
         id: pull_config
-        uses: HerodotusDev/cicd/.github/actions/pull-etcd-config@main
+        uses: HerodotusDev/cicd/.github/actions/pull-etcd-config@new-main
         with:
           namespace: ${{ env.namespace }}
           app_name: ${{ matrix.app.etcd_name }}
-          etcd_user: ${{ env.ARC_ETCD_USER }}
-          etcd_password: ${{ env.ARC_ETCD_PASSWORD }}
+          etcd_user: ${{ env.ETCD_USER }}
+          etcd_password: ${{ env.ETCD_PASSWORD }}
           etcd_root: ${{ env.etcd_root || env.repo_name }}
           k8s_env: ${{ env.k8s_env }}
 
       - name: Deploy to Kubernetes
-        uses: HerodotusDev/cicd/.github/actions/deploy-to-k8s@main
+        uses: HerodotusDev/cicd/.github/actions/deploy-to-k8s@new-main
         with:
           namespace: ${{ env.namespace }}
           deployment_file: ./k8s/${{ env.k8s_env }}/${{ matrix.app.manifest_name }}-deployment.yaml
           ingress_file: ./k8s/${{ env.k8s_env }}/${{ matrix.app.manifest_name }}-ingress.yaml
           rollout_timeout: ${{ env.rollout_timeout }}
           image_tag: ${{ fromJson(needs.define-matrix.outputs.app_versions)[matrix.app.name] }}
-          image_prefix: ${{ env.image_prefix }}
-          dockerhub_project: ${{ env.dockerhub_project }}
+          image_suffix: ${{ env.image_suffix }}
+          registry: ${{ env.registry }}
           app_name: ${{ matrix.app.name }}
           config_changed: ${{ steps.pull_config.outputs.config_changed == 'true' || steps.ensure_configmap.outputs.config_changed == 'true' }}
-          edge_verify_secret: ${{ env.ARC_EDGE_VERIFY_SECRET }}

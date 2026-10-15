@@ -1,0 +1,93 @@
+# Smoke test for the new-reality deploy path (side branch).
+# Verifies end-to-end: WG tunnel -> capsule proxy -> deployer kubeconfig ->
+# daloc-prod reachability -> etcd port-forward over the tunnel -> etcd-pull
+# container against 127.0.0.1:2379.
+# Triggers on pushes touching the deploy-path files so regressions surface
+# before cutover. Skips quietly until the WG_CONFIG / DEPLOYER_KUBECONFIG org
+# secrets exist. At cutover this file either moves to main or gets dropped.
+name: Cluster access smoke
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - new-main
+    paths:
+      - ".github/workflows/cluster-access-smoke.yaml"
+      - ".github/actions/cluster-access/**"
+      - ".github/actions/pull-etcd-config/**"
+      - ".github/actions/resolve-overrides/**"
+
+permissions:
+  contents: read
+
+jobs:
+  smoke:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Check secrets present
+        id: secrets
+        run: |
+          if [ -z "${{ secrets.WG_CONFIG }}" ] || [ -z "${{ secrets.DEPLOYER_KUBECONFIG }}" ]; then
+            echo "WG_CONFIG / DEPLOYER_KUBECONFIG not set yet — skipping smoke run."
+            echo "skip=true" >> "$GITHUB_OUTPUT"
+          fi
+        shell: bash
+
+      - name: Cluster access (etcd over tunnel)
+        if: steps.secrets.outputs.skip != 'true'
+        uses: HerodotusDev/cicd/.github/actions/cluster-access@new-main
+        with:
+          wg_config: ${{ secrets.WG_CONFIG }}
+          deployer_kubeconfig: ${{ secrets.DEPLOYER_KUBECONFIG }}
+          namespace: daloc-prod
+          etcd_forward: true
+
+      - name: Deployer can see daloc-prod
+        if: steps.secrets.outputs.skip != 'true'
+        run: |
+          kubectl get pods -n daloc-prod
+          kubectl get svc -n daloc-prod
+        shell: bash
+
+      - name: Install etcdctl
+        if: steps.secrets.outputs.skip != 'true'
+        run: |
+          set -euo pipefail
+          curl -fsSL "https://github.com/etcd-io/etcd/releases/download/v3.5.21/etcd-v3.5.21-linux-amd64.tar.gz" -o /tmp/etcd.tgz
+          tar -xzf /tmp/etcd.tgz -C /tmp
+          sudo install /tmp/etcd-v3.5.21-linux-amd64/etcdctl /usr/local/bin/etcdctl
+          etcdctl version
+
+      - name: etcd round-trip through the tunnel (write + pipeline container read-back)
+        if: steps.secrets.outputs.skip != 'true'
+        run: |
+          set -euo pipefail
+          # 1. Write a probe key via the forwarded etcd.
+          ETCDCTL_API=3 etcdctl --endpoints=http://127.0.0.1:2379 \
+            --user "root:${ETCD_PASSWORD}" \
+            put /smoke/probe/.env "SMOKE=ok" >/dev/null
+          # 2. Read it back with the same etcd-pull container the pipeline uses
+          #    for config pulls (network host so it sees the forwarded port).
+          rm -rf output && mkdir -p output
+          docker run --rm --network host \
+            -e ETCD_HOST="http://127.0.0.1:2379" \
+            -e ETCD_USER="root" \
+            -e ETCD_PASSWORD="${ETCD_PASSWORD}" \
+            -e ETCD_KEY="/smoke/probe/.env" \
+            -e APP_NAME="smoke-probe" \
+            -e NAMESPACE="daloc-prod" \
+            -v "${{ github.workspace }}/output:/output" \
+            dataprocessor/etcd-pull:0.2
+          # 3. Verify the rendered secret carries the probe value.
+          decoded=$(grep -A1 '^data:' output/secret.yaml | grep 'SMOKE:' | awk '{print $2}' | base64 -d)
+          [ "${decoded}" = "ok" ] || { echo "::error::unexpected probe value: ${decoded}"; exit 1; }
+          echo "etcd round-trip OK"
+          ETCDCTL_API=3 etcdctl --endpoints=http://127.0.0.1:2379 \
+            --user "root:${ETCD_PASSWORD}" \
+            del --prefix /smoke/ >/dev/null
+        shell: bash
+        env:
+          ETCD_PASSWORD: ${{ env.ETCD_PASSWORD }}

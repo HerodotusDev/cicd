@@ -15,8 +15,8 @@ inputs:
   image_tag:
     description: "Image tag to deploy."
     required: true
-  dockerhub_project:
-    description: "Docker Hub project or repository prefix."
+  registry:
+    description: "Image repository prefix incl. registry host (e.g. ghcr.io/herodotusdev)."
     required: true
   app_name:
     description: "Application name (used for pod delete/wait lookups)."
@@ -25,11 +25,10 @@ inputs:
     description: "Image name to substitute in the manifest. Defaults to app_name when empty."
     required: false
     default: ""
-  image_prefix:
-    description: "Image name prefix for the target environment ('stg-' or ''). Derived once in load-inputs; passed in by the caller."
+  image_suffix:
+    description: "Image name suffix for the target environment ('-prod' or '-stg'). Derived once in load-inputs; passed in by the caller."
     required: false
     default: ""
-
 runs:
   using: "composite"
   steps:
@@ -45,7 +44,7 @@ runs:
           if [ -z "$IMAGE_NAME" ]; then
             IMAGE_NAME="${{ inputs.app_name }}"
           fi
-          sed -i "s|<IMAGE>|${{ inputs.dockerhub_project }}/${{ inputs.image_prefix }}${IMAGE_NAME}:${{ inputs.image_tag }}|g" "${{ inputs.pod_manifest }}"
+          sed -i "s|<IMAGE>|${{ inputs.registry }}/${IMAGE_NAME}${{ inputs.image_suffix }}:${{ inputs.image_tag }}|g" "${{ inputs.pod_manifest }}"
         else
           echo "Manifest ${{ inputs.pod_manifest }} not found. Nothing to update."
         fi

@@ -27,18 +27,19 @@ restart_also:
 
 # etcd endpoint overrides keyed by target namespace. When a namespace is absent
 # here, the action's default host is used with the bridge docker network.
+# GitHub-hosted runners cannot resolve cluster DNS: the cluster-access action
+# port-forwards the in-namespace daloc-etcd to 127.0.0.1:2379 and exports the
+# root credentials as ETCD_USER/ETCD_PASSWORD, so deploys reach etcd over the
+# WireGuard tunnel via localhost (docker_network: host so the etcd-pull
+# container sees the forwarded port).
 etcd_hosts:
-  stg-daloc:
-    host: http://daloc-etcd.stg-daloc.svc.cluster.local:2379
+  daloc-prod:
+    host: http://127.0.0.1:2379
     docker_network: host
-    user: read_user
-    password_env: ARC_DALOC_ETCD_PASSWORD
-  # beta-v2 production namespace: dedicated in-namespace etcd. docker_network
-  # host is required so the etcd-pull container resolves *.svc.cluster.local
-  # (default bridge DNS cannot). Without this entry, prod-daloc deploys would
-  # silently target the shared cluster etcd with the wrong credentials.
-  prod-daloc:
-    host: http://daloc-etcd.prod-daloc.svc.cluster.local:2379
+    user: root
+    password_env: ETCD_PASSWORD
+  daloc-stg:
+    host: http://127.0.0.1:2379
     docker_network: host
-    user: read_user
-    password_env: ARC_DALOC_PROD_ETCD_PASSWORD
+    user: root
+    password_env: ETCD_PASSWORD

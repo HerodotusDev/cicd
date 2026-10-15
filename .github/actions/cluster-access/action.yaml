@@ -1,0 +1,119 @@
+---
+name: "Cluster Access"
+description: >
+  Opens the WireGuard tunnel to the home k3s cluster, exports the deployer
+  kubeconfig (KUBECONFIG env), and optionally port-forwards the in-namespace
+  daloc-etcd to 127.0.0.1:2379 while exporting its root credentials as
+  ETCD_USER/ETCD_PASSWORD. Run as the first step of any job that touches the
+  cluster or etcd. GitHub-hosted runners are ephemeral, so the tunnel, the
+  forwarded port and the background kubectl process die with the job — no
+  teardown step needed.
+
+inputs:
+  wg_config:
+    description: "Full wg-quick config for the daloc-deployer peer (org secret WG_CONFIG)."
+    required: true
+  deployer_kubeconfig:
+    description: "Kubeconfig for the daloc-deployer identity (org secret DEPLOYER_KUBECONFIG), pointing at the capsule proxy via the tunnel."
+    required: true
+  namespace:
+    description: "Namespace holding daloc-etcd (used for the etcd forward + credential read)."
+    required: false
+    default: "daloc-prod"
+  etcd_forward:
+    description: "'true' to port-forward daloc-etcd to 127.0.0.1:2379 and export ETCD_USER/ETCD_PASSWORD."
+    required: false
+    default: "false"
+  etcd_service:
+    description: "Service to forward for etcd access."
+    required: false
+    default: "svc/daloc-etcd"
+  etcd_secret:
+    description: "Secret holding the etcd root password (key: etcd-root-password)."
+    required: false
+    default: "daloc-etcd"
+
+runs:
+  using: "composite"
+  steps:
+    - name: Set up kubectl
+      uses: azure/setup-kubectl@v4
+      with:
+        version: "v1.32.0"
+
+    - name: Install wireguard-tools
+      shell: bash
+      run: |
+        if ! command -v wg >/dev/null 2>&1; then
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq wireguard-tools
+        fi
+        wg --version
+
+    - name: Open WireGuard tunnel
+      shell: bash
+      env:
+        WG_CONFIG: ${{ inputs.wg_config }}
+      run: |
+        set -euo pipefail
+        # Mask every secret-looking line of the peer config before it lands on disk.
+        while IFS= read -r line; do
+          value=$(printf '%s' "$line" | sed -n 's/^[[:space:]]*\(PrivateKey\|PreSharedKey\|PublicKey\)[[:space:]]*=[[:space:]]*\(.*\)$/\2/p')
+          [ -n "$value" ] && echo "::add-mask::${value}"
+        done <<< "$WG_CONFIG"
+        conf="${RUNNER_TEMP}/wg0.conf"
+        printf '%s\n' "$WG_CONFIG" > "$conf"
+        chmod 600 "$conf"
+        sudo wg-quick up "$conf"
+
+    - name: Export deployer kubeconfig
+      shell: bash
+      env:
+        DEPLOYER_KUBECONFIG: ${{ inputs.deployer_kubeconfig }}
+      run: |
+        set -euo pipefail
+        # Mask the credential-bearing lines (token, password, client-key-data).
+        while IFS= read -r line; do
+          value=$(printf '%s' "$line" | sed -n 's/^\( *token:\| *password:\| *client-key-data:\) *\(.*\)$/\2/p')
+          [ -n "$value" ] && echo "::add-mask::${value}"
+        done <<< "$DEPLOYER_KUBECONFIG"
+        kubeconfig="${RUNNER_TEMP}/kubeconfig.yaml"
+        printf '%s\n' "$DEPLOYER_KUBECONFIG" > "$kubeconfig"
+        chmod 600 "$kubeconfig"
+        echo "KUBECONFIG=${kubeconfig}" >> "$GITHUB_ENV"
+
+    - name: Verify cluster reachability
+      shell: bash
+      run: |
+        kubectl auth can-i get pods -n "${{ inputs.namespace }}" \
+          || { echo "::error::Deployer identity cannot reach ${{ inputs.namespace }}"; exit 1; }
+
+    - name: Forward etcd and export credentials
+      if: inputs.etcd_forward == 'true'
+      shell: bash
+      run: |
+        set -euo pipefail
+        ns="${{ inputs.namespace }}"
+        password=$(kubectl -n "$ns" get secret "${{ inputs.etcd_secret }}" \
+          -o jsonpath='{.data.etcd-root-password}' | base64 -d)
+        echo "::add-mask::${password}"
+        {
+          echo "ETCD_USER=root"
+          echo "ETCD_PASSWORD=${password}"
+        } >> "$GITHUB_ENV"
+
+        kubectl -n "$ns" port-forward "${{ inputs.etcd_service }}" 2379:2379 \
+          >"${RUNNER_TEMP}/etcd-forward.log" 2>&1 &
+        echo $! > "${RUNNER_TEMP}/etcd-forward.pid"
+
+        for i in $(seq 1 30); do
+          if curl -fsS http://127.0.0.1:2379/health >/dev/null 2>&1; then
+            echo "etcd reachable at 127.0.0.1:2379 (attempt ${i})"
+            curl -fsS http://127.0.0.1:2379/health
+            exit 0
+          fi
+          sleep 1
+        done
+        echo "::error::etcd port-forward did not come up; log:"
+        cat "${RUNNER_TEMP}/etcd-forward.log"
+        exit 1

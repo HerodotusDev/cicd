@@ -52,20 +52,20 @@ runs:
     - name: Overwrite envs
       shell: bash
       run: |
-        # Single source of truth for branch -> environment + image prefix.
-        # Consumed downstream as env.k8s_env, env.namespace and env.image_prefix.
-        # Default to the staging image prefix; only main builds and deploys
-        # unprefixed (prod) images.
-        image_prefix="stg-"
+        # Single source of truth for branch -> environment + image suffix.
+        # Consumed downstream as env.k8s_env, env.namespace and env.image_suffix.
+        # Namespaces are <inputs namespace>-<env> (e.g. daloc -> daloc-prod) and
+        # images carry the same suffix (ghcr.io/herodotusdev/<app>-<env>).
+        image_suffix="-stg"
         if [ "${GITHUB_REF_NAME}" = "develop" ]; then
-          echo "namespace=stg-${{env.namespace}}" >> $GITHUB_ENV
+          echo "namespace=${{env.namespace}}-stg" >> $GITHUB_ENV
           echo "k8s_env=stg" >> $GITHUB_ENV
         elif [ "${GITHUB_REF_NAME}" = "main" ]; then
-          echo "namespace=prod-${namespace}" >> $GITHUB_ENV
+          echo "namespace=${{env.namespace}}-prod" >> $GITHUB_ENV
           echo "k8s_env=prod" >> $GITHUB_ENV
-          image_prefix=""
+          image_suffix="-prod"
         fi
-        echo "image_prefix=${image_prefix}" >> $GITHUB_ENV
+        echo "image_suffix=${image_suffix}" >> $GITHUB_ENV
 
         repo_name=$(basename "$GITHUB_REPOSITORY")
         echo "repo_name=$repo_name" >> $GITHUB_ENV

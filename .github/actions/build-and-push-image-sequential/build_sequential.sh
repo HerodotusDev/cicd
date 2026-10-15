@@ -50,7 +50,7 @@ for ((i = 0; i < apps_length; i++)); do
 
   echo "::group::[$((i + 1))/${apps_length}] ${name} (version ${version})"
 
-  image="${DOCKERHUB_PROJECT}/${IMAGE_PREFIX}${name}"
+  image="${REGISTRY}/${name}${IMAGE_SUFFIX}"
 
   # resolve-overrides: repo dockerfile override + APP_NAME strip prefix.
   dockerfile=$(yq ".repos.\"${repo}\".dockerfile // \"\"" "${overrides_file}")

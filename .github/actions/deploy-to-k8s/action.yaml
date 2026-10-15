@@ -19,24 +19,20 @@ inputs:
     description: "Image tag to deployed."
     required: true
     default: latest
-  dockerhub_project:
-    description: "The Docker Hub project (or organization/repository prefix) (e.g. myorg)"
+  registry:
+    description: "Image repository prefix incl. registry host (e.g. ghcr.io/herodotusdev). Image = <registry>/<app><image_suffix>:<version>."
     required: true
   app_name:
     description: "The application name to form the image name."
     required: true
-  image_prefix:
-    description: "Image name prefix for the target environment ('stg-' or ''). Derived once in load-inputs; passed in by the caller."
+  image_suffix:
+    description: "Image name suffix for the target environment ('-prod' or '-stg'). Derived once in load-inputs; passed in by the caller."
     required: false
     default: ""
   config_changed:
     description: "Whether config (secret/configmap) changed and deployment needs restart"
     required: false
     default: "false"
-  edge_verify_secret:
-    description: "Geoblock origin-lock secret. If set, replaces the __EDGE_VERIFY_SECRET__ placeholder in the ingress file before apply (no-op when the placeholder is absent). Sourced from the runner env (env.ARC_EDGE_VERIFY_SECRET); never committed to a repo."
-    required: false
-    default: ""
 
 runs:
   using: "composite"
@@ -57,20 +53,9 @@ runs:
 
     - name: Update deployment YAML with image tag
       run: |
-        sed -i "s|<IMAGE>|${{ inputs.dockerhub_project }}/${{ inputs.image_prefix }}${{ inputs.app_name }}:${{ inputs.image_tag }}|g" "${{ inputs.deployment_file }}"
+        sed -i "s|<IMAGE>|${{ inputs.registry }}/${{ inputs.app_name }}${{ inputs.image_suffix }}:${{ inputs.image_tag }}|g" "${{ inputs.deployment_file }}"
       shell: bash
 
-    - name: Inject geoblock origin-lock secret into ingress
-      if: ${{ inputs.edge_verify_secret != '' }}
-      shell: bash
-      env:
-        EDGE_VERIFY_SECRET: ${{ inputs.edge_verify_secret }}
-      run: |
-        echo "::add-mask::$EDGE_VERIFY_SECRET"
-        if [ -f "${{ inputs.ingress_file }}" ]; then
-          sed -i "s|__EDGE_VERIFY_SECRET__|${EDGE_VERIFY_SECRET}|g" "${{ inputs.ingress_file }}"
-        fi
-      
     - name: Deploy Deployment YAML (if exists)
       run: |
         if [ -f "${{ inputs.deployment_file }}" ]; then
