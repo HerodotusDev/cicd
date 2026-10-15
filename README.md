@@ -15,11 +15,17 @@
 
 Other branches are blocked. Environments are à la carte: wire only the branches you use; create the target namespace (as the tenant owner) before the first deploy.
 
-## Required secrets (org-level, shared)
+## Required secrets (org-level defaults, per-repo overrides)
 | Secret | Content |
 |--------|---------|
-| `WG_CONFIG` | wg-quick config of the `daloc-deployer` WireGuard peer (tunnel to the cluster proxy only) |
+| `WG_CONFIG` | wg-quick config of a `daloc-deployer` WireGuard peer (tunnel to the cluster proxy only) |
 | `DEPLOYER_KUBECONFIG` | kubeconfig for the `capsule-users/daloc-deployer` ServiceAccount, pointing at the capsule proxy |
+
+Both are org secrets shared by consumer repos. **WireGuard peers are one session per key** — a second handshake with the same key kills the first tunnel. Hence the convention:
+
+- **Org secret `WG_CONFIG`** holds the default peer (used by the cicd smoke workflow).
+- **Repos that deploy get their own peer + a repo-level `WG_CONFIG` secret** (repo secrets shadow org secrets): `daloc-deployer-monorepo`, `daloc-deployer-frontend-new`, `daloc-deployer-k8s`, … Create the OPNsense peer, put its config in the repo secret. With per-repo peers, two repos deploying at the same time is harmless — different keys, independent tunnels.
+- Inside one repo, the tunnel-using matrix jobs are serialized (`max-parallel: 1` on `deploy` + `deploy-init-pods`) so a single repo can't clash with itself.
 
 The pipeline logs in to ghcr with the caller's `GITHUB_TOKEN` — consumer workflows need `packages: write`. etcd credentials are read at deploy time from the in-namespace `daloc-etcd` secret; no etcd secret lives in GitHub.
 

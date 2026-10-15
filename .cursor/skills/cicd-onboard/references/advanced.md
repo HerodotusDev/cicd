@@ -43,14 +43,18 @@ Jobs run on GitHub-hosted runners (`ubuntu-latest`). Cluster access is set up
 per job by the **`cluster-access` composite action** (first step of every
 kubectl/etcd-touching job):
 
-- `WG_CONFIG` + `DEPLOYER_KUBECONFIG` are **org secrets** (shared, selected repos) —
-  a consumer repo does not create or pass them; the reusable workflow references
-  them directly.
+- `WG_CONFIG` + `DEPLOYER_KUBECONFIG` are org secrets; deploying repos override
+  `WG_CONFIG` with a **repo-level secret holding their own WG peer** (one peer
+  per key — concurrent deploys from different repos each get their own tunnel;
+  see the root README). A consumer repo does not create or pass these; the
+  reusable workflow references them directly.
 - ghcr login uses the caller's `GITHUB_TOKEN` — consumer workflows need
   `packages: write`.
 - etcd credentials are read at deploy time from the in-namespace `daloc-etcd`
   secret and exported as `ETCD_USER`/`ETCD_PASSWORD` for that job only; nothing
   etcd-related is stored in GitHub.
+- Tunnel-using matrix jobs (`deploy`, `deploy-init-pods`) run with
+  `max-parallel: 1` so a repo never clashes with itself.
 
 ## Build-skip & tagging (the parts not covered elsewhere)
 
