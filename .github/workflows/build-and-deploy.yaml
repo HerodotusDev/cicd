@@ -257,7 +257,10 @@ jobs:
     needs: [define-matrix, create-git-tag, build-and-push-image, build-and-push-image-sequential, build-and-push-init]
     if: ${{ !cancelled() && needs.define-matrix.result == 'success' && needs.create-git-tag.result == 'success' && (needs.build-and-push-image.result == 'success' || needs.build-and-push-image-sequential.result == 'success') && needs.build-and-push-init.result == 'success' }}
     runs-on: ubuntu-latest
+    # One WG peer per org: tunnel sessions must not overlap (WireGuard moves
+    # the session on every handshake), so tunnel-using matrix jobs run serially.
     strategy:
+      max-parallel: 1
       matrix:
         app: ${{ fromJson(needs.define-matrix.outputs.matrix_init) }}
     steps:
@@ -303,7 +306,10 @@ jobs:
     needs: [define-matrix, create-git-tag, build-and-push-image, build-and-push-image-sequential, deploy-init-pods]
     if: ${{ !cancelled() && needs.define-matrix.result == 'success' && needs.create-git-tag.result == 'success' && (needs.build-and-push-image.result == 'success' || needs.build-and-push-image-sequential.result == 'success') && needs.deploy-init-pods.result == 'success' }}
     runs-on: ubuntu-latest
+    # One WG peer per org: tunnel sessions must not overlap (WireGuard moves
+    # the session on every handshake), so tunnel-using matrix jobs run serially.
     strategy:
+      max-parallel: 1
       matrix:
         app: ${{ fromJson(needs.define-matrix.outputs.matrix_deploy) }}
     outputs:
