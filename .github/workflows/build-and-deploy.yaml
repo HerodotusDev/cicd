@@ -110,6 +110,8 @@ jobs:
           dockerhub_project: ${{ env.dockerhub_project }}
           app_name: ${{ matrix.app.name }}
           image_prefix: ${{ env.image_prefix }}
+          image_suffix: ${{ env.image_suffix }}
+          registry: ${{ env.image_registry }}
           version: ${{ fromJson(needs.define-matrix.outputs.app_versions)[matrix.app.name] }}
           docker_username: ${{ env.ARC_DOCKER_USERNAME }}
           docker_password: ${{ env.ARC_DOCKER_PASSWORD }}
@@ -143,6 +145,8 @@ jobs:
         with:
           dockerhub_project: ${{ env.dockerhub_project }}
           image_prefix: ${{ env.image_prefix }}
+          image_suffix: ${{ env.image_suffix }}
+          registry: ${{ env.image_registry }}
           matrix_deploy: ${{ needs.define-matrix.outputs.matrix_deploy }}
           app_versions: ${{ needs.define-matrix.outputs.app_versions }}
           docker_username: ${{ env.ARC_DOCKER_USERNAME }}
@@ -191,6 +195,8 @@ jobs:
           dockerhub_project: ${{ env.dockerhub_project }}
           app_name: ${{ matrix.app.name }}
           image_prefix: ${{ env.image_prefix }}
+          image_suffix: ${{ env.image_suffix }}
+          registry: ${{ env.image_registry }}
           version: ${{ needs.define-matrix.outputs.primary_version }}
           docker_username: ${{ env.ARC_DOCKER_USERNAME }}
           docker_password: ${{ env.ARC_DOCKER_PASSWORD }}
@@ -258,6 +264,7 @@ jobs:
           rollout_timeout: ${{ env.rollout_timeout }}
           image_tag: ${{ needs.define-matrix.outputs.primary_version }}
           image_prefix: ${{ env.image_prefix }}
+          image_suffix: ${{ env.image_suffix }}
           dockerhub_project: ${{ env.dockerhub_project }}
           app_name: ${{ matrix.app.name }}
           image_name: ${{ matrix.app.image }}
@@ -312,6 +319,7 @@ jobs:
           rollout_timeout: ${{ env.rollout_timeout }}
           image_tag: ${{ fromJson(needs.define-matrix.outputs.app_versions)[matrix.app.name] }}
           image_prefix: ${{ env.image_prefix }}
+          image_suffix: ${{ env.image_suffix }}
           dockerhub_project: ${{ env.dockerhub_project }}
           app_name: ${{ matrix.app.name }}
           config_changed: ${{ steps.pull_config.outputs.config_changed == 'true' || steps.ensure_configmap.outputs.config_changed == 'true' }}

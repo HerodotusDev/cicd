@@ -61,9 +61,19 @@ runs:
           echo "namespace=stg-${{env.namespace}}" >> $GITHUB_ENV
           echo "k8s_env=stg" >> $GITHUB_ENV
         elif [ "${GITHUB_REF_NAME}" = "main" ]; then
-          echo "namespace=prod-${namespace}" >> $GITHUB_ENV
           echo "k8s_env=prod" >> $GITHUB_ENV
           image_prefix=""
+          # New-cluster scheme, opt-in via cicd-inputs keys (emitted as env by
+          # load_inputs.sh): explicit prod namespace + image suffix/registry
+          # instead of the legacy prod-<ns> prefix scheme. Consumers without
+          # these keys keep the old prod-daloc-style behavior.
+          if [ -n "${prod_namespace:-}" ]; then
+            echo "namespace=${prod_namespace}" >> $GITHUB_ENV
+            echo "image_suffix=${prod_image_suffix:-}" >> $GITHUB_ENV
+            echo "image_registry=${prod_registry:-}" >> $GITHUB_ENV
+          else
+            echo "namespace=prod-${namespace}" >> $GITHUB_ENV
+          fi
         fi
         echo "image_prefix=${image_prefix}" >> $GITHUB_ENV
 

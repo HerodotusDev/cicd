@@ -29,6 +29,10 @@ inputs:
     description: "Image name prefix for the target environment ('stg-' or ''). Derived once in load-inputs; passed in by the caller."
     required: false
     default: ""
+  image_suffix:
+    description: "Image name suffix for the target environment (e.g. '-prod'). Derived once in load-inputs; passed in by the caller."
+    required: false
+    default: ""
   config_changed:
     description: "Whether config (secret/configmap) changed and deployment needs restart"
     required: false
@@ -57,7 +61,7 @@ runs:
 
     - name: Update deployment YAML with image tag
       run: |
-        sed -i "s|<IMAGE>|${{ inputs.dockerhub_project }}/${{ inputs.image_prefix }}${{ inputs.app_name }}:${{ inputs.image_tag }}|g" "${{ inputs.deployment_file }}"
+        sed -i "s|<IMAGE>|${{ inputs.dockerhub_project }}/${{ inputs.image_prefix }}${{ inputs.app_name }}${{ inputs.image_suffix }}:${{ inputs.image_tag }}|g" "${{ inputs.deployment_file }}"
       shell: bash
 
     - name: Inject geoblock origin-lock secret into ingress

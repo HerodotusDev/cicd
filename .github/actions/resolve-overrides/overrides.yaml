@@ -42,3 +42,12 @@ etcd_hosts:
     docker_network: host
     user: read_user
     password_env: ARC_DALOC_PROD_ETCD_PASSWORD
+  # Home (tenant) k3s cluster: namespace daloc-prod with its own in-namespace
+  # etcd (Bitnami chart). Same read_user + runner secret as prod-daloc, so no
+  # runner-secret changes are needed. Replace the prod-daloc entry above once
+  # daloc is fully cut over to the home cluster.
+  daloc-prod:
+    host: http://daloc-etcd.daloc-prod.svc.cluster.local:2379
+    docker_network: host
+    user: read_user
+    password_env: ARC_DALOC_PROD_ETCD_PASSWORD
