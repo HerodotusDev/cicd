@@ -1,5 +1,7 @@
 # Sample cicd-inputs.yaml.
 # Every key becomes an env var for the workflow; comment lines list defaults when omitted.
+# NOTE: images build multi-arch (linux/amd64 + linux/arm64) by default — keep base images
+# multi-arch and avoid hardcoded x86_64 paths/tools in Dockerfiles.
 
 namespace: example                  # required. loader rewrites to <namespace>-stg / <namespace>-prod on develop/main.
 version_file: ./package.json        # optional. defaults to workflow env.version_file (./package.json).
@@ -15,6 +17,9 @@ app_names:
     # image: example                # optional. for init pods only. reuse another app's Docker image instead of building
     #                               #   a separate one. when set and different from name, build is skipped and the named
     #                               #   app's image is injected into the pod manifest. defaults to app name.
+    # cache_mode: max                # optional. GHA cache export mode (min = final layers only, max = all stages).
+    # cache_scope: my-scope          # optional. custom GHA cache scope key.
+    # platforms: linux/amd64,linux/arm64  # optional. defaults to both. use "linux/amd64" to opt out of arm64 (parallel strategy only).
   - "example2"                      # plain strings pick up all defaults.
 
 

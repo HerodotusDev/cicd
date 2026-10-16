@@ -58,7 +58,7 @@ kubectl/etcd-touching job):
 
 ## Build-skip & tagging (the parts not covered elsewhere)
 
-- The build is **skipped if `<image>:<version>` already exists** in the registry (`docker manifest inspect`). Bumping the version file is the only thing that forces a rebuild — re-running the same version reuses the existing image.
+- The build is **skipped if `<image>:<version>` already exists** in the registry (`docker manifest inspect` — also true for multi-arch manifest lists). Bumping the version file is the only thing that forces a rebuild — re-running the same version reuses the existing image.
 - The repo is git-tagged with the first app's resolved version, skipped if that tag already exists.
 
 ## Troubleshooting

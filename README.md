@@ -1,5 +1,6 @@
 ## What the pipeline delivers
 - Publishes a Docker image to `ghcr.io/herodotusdev/<app>-<env>:<version>` when the version changes (skips the build if the tag already exists — version bumps drive deploys).
+- Images are **multi-arch manifest lists** (`linux/amd64` + `linux/arm64`) by default — the home cluster schedules pods onto both amd64 (`ms`) and arm64 (RPi) nodes, and the kubelet pulls whichever arch matches the node. See "Multi-arch builds" below.
 - Tags the repo with that version.
 - Opens a WireGuard tunnel to the home k3s cluster and applies Kubernetes manifests for each app as the `daloc-deployer` identity.
 - Syncs configuration from etcd (over the tunnel, via port-forward) and configmap dirs before deployment.
@@ -55,6 +56,15 @@ tools/install-skill.sh --help   # full usage
 ```
 
 Once installed, ask the agent to onboard the repo and it follows the skill.
+
+## Multi-arch builds
+Images build for `linux/amd64` + `linux/arm64` in one `docker buildx build` on the amd64 runner: arm64 compiles under QEMU (`docker/setup-qemu-action`), and BuildKit pushes a single manifest list, so no merge job exists and `docker manifest inspect` tag-skip logic works unchanged. Kubernetes never needs arch hints — the kubelet resolves the platform from the list.
+
+Caching is per platform within the same BuildKit GHA cache scope: amd64 and arm64 layers are stored/restored independently, so a code-only change re-runs only the compile layer of the changed arch. First build after cache eviction is the slow one (a cold arm64 Rust workspace build under QEMU can take hours); steady-state small diffs stay fast because dependency layers (`cargo-chef cook`, node_modules) are cached per arch.
+
+Per-app controls (`k8s/cicd-inputs.yaml`, parallel strategy): `platforms: linux/amd64` opts an app out of arm64. Sequential strategy builds every app for both platforms in one buildx context (the shared-compile trick holds per platform).
+
+Dockerfile requirements: base images (`FROM ...`) must be multi-arch manifests (all official rust/debian/node/bun images are) and must not hardcode `x86_64` paths or tools. `.github/workflows/multiarch-smoke.yaml` proves the path on every push touching the build actions.
 
 ## Etcd configuration
 Upload the configuration file to etcd before the workflow runs. The workflow reads `/etcd_root/k8s_env/app_name/.env` and writes it into `<app_name>-secret`.
