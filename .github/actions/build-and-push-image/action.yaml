@@ -52,10 +52,18 @@ inputs:
     description: "Optional GHA cache scope key. When set, cache-from/to use this scope instead of the default buildkit bucket."
     required: false
     default: ""
+  platforms:
+    description: "Comma-separated buildx platforms (default: linux/amd64,linux/arm64 — the home cluster schedules onto both amd64 and arm64 nodes). BuildKit stores layer caches per platform under the same scope. To opt an app out of arm64, set platforms: linux/amd64 in its cicd-inputs entry."
 
 runs:
   using: "composite"
   steps:
+    - name: Set up QEMU (binfmt for arm64)
+      if: contains(inputs.platforms, 'arm64')
+      uses: docker/setup-qemu-action@v3
+      with:
+        platforms: arm64
+
     - name: Checkout code
       uses: actions/checkout@v4
       with:
@@ -127,6 +135,7 @@ runs:
       with:
         context: ${{ inputs.context }}
         file: ./docker/Dockerfile.${{ steps.overrides.outputs.dockerfile }}
+        platforms: ${{ inputs.platforms }}
         push: true
         cache-from: type=gha${{ inputs.cache_scope != '' && format(',scope={0}', inputs.cache_scope) || '' }}
         cache-to: type=gha,mode=${{ inputs.cache_mode }}${{ inputs.cache_scope != '' && format(',scope={0}', inputs.cache_scope) || '' }}

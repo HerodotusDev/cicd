@@ -48,6 +48,8 @@ inputs:
   k8s_env:
     description: "Kubernetes environment (stg / prod)."
     required: true
+  platforms:
+    description: "Comma-separated buildx platforms for every app in the loop (default: linux/amd64,linux/arm64). BuildKit compiles each platform once per shared layer; in-job + GHA caches are keyed per platform. Per-app platform overrides are a parallel-strategy feature only."
 
 runs:
   using: "composite"
@@ -76,6 +78,12 @@ runs:
       with:
         install: true
 
+    - name: Set up QEMU (binfmt for arm64)
+      if: contains(inputs.platforms, 'arm64')
+      uses: docker/setup-qemu-action@v3
+      with:
+        platforms: arm64
+
     - name: Build and push images
       shell: bash
       env:
@@ -88,5 +96,6 @@ runs:
         ETCD_USER: ${{ inputs.etcd_user }}
         ETCD_PASSWORD: ${{ inputs.etcd_password }}
         K8S_ENV: ${{ inputs.k8s_env }}
+        PLATFORMS: ${{ inputs.platforms }}
       run: |
         bash "${GITHUB_ACTION_PATH}/build_sequential.sh"

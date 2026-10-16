@@ -132,6 +132,7 @@ jobs:
           build_env_file: ${{ steps.build-env.outputs.env_file }}
           cache_mode: ${{ matrix.app.cache_mode || 'max' }}
           cache_scope: ${{ matrix.app.cache_scope || '' }}
+          platforms: ${{ matrix.app.platforms || 'linux/amd64,linux/arm64' }}
 
   build-and-push-image-sequential:
     if: inputs.build-strategy == 'sequential'
@@ -229,6 +230,7 @@ jobs:
           submodules: ${{ inputs.submodules }}
           cache_mode: ${{ matrix.app.cache_mode || 'max' }}
           cache_scope: ${{ matrix.app.cache_scope || '' }}
+          platforms: ${{ matrix.app.platforms || 'linux/amd64,linux/arm64' }}
 
   create-git-tag:
     needs: [define-matrix, build-and-push-image, build-and-push-image-sequential]

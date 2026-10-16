@@ -31,7 +31,8 @@ if [[ "${apps_length}" -eq 0 ]]; then
   echo "No deploy apps requested. Nothing to build."
   exit 0
 fi
-echo "Sequential build: ${apps_length} app(s) in one buildx context."
+platforms="${PLATFORMS:-linux/amd64,linux/arm64}"
+echo "Sequential build: ${apps_length} app(s) in one buildx context (platforms: ${platforms})."
 
 for ((i = 0; i < apps_length; i++)); do
   app=$(printf '%s' "${MATRIX_DEPLOY}" | jq -c ".[${i}]")
@@ -155,9 +156,10 @@ for ((i = 0; i < apps_length; i++)); do
     cache_to="type=gha,mode=${cache_mode},scope=${cache_scope}"
   fi
 
-  echo "Building ${image}:${version} (dockerfile ./docker/Dockerfile.${dockerfile}, APP_NAME=${app_arg})"
+  echo "Building ${image}:${version} (dockerfile ./docker/Dockerfile.${dockerfile}, APP_NAME=${app_arg}, platforms ${platforms})"
   docker buildx build \
     --push \
+    --platform "${platforms}" \
     --file "./docker/Dockerfile.${dockerfile}" \
     --cache-from "${cache_from}" \
     --cache-to "${cache_to}" \
