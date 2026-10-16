@@ -1,0 +1,9 @@
+# Multi-arch smoke image: proves the pipeline's cross-platform build path
+# (buildx + QEMU + manifest-list push) on a real GH runner.
+# Deliberately no RUN at build time — busybox is the official multi-arch
+# image, so both platforms resolve to native binaries; the emulated
+# execution happens only in the smoke workflow's `docker run --platform
+# linux/arm64` check.
+FROM busybox:1.37
+COPY entry.sh /entry.sh
+ENTRYPOINT ["/bin/sh", "/entry.sh"]
