@@ -89,15 +89,12 @@ for ((i = 0; i < apps_length; i++)); do
   if [[ "${etcd_build_env}" == "true" ]]; then
     # resolve-overrides etcd host/user/password lookups + pull-etcd-build-env.
     ovr_host=$(yq ".etcd_hosts.\"${NAMESPACE}\".host // \"\"" "${overrides_file}")
-    ovr_net=$(yq ".etcd_hosts.\"${NAMESPACE}\".docker_network // \"\"" "${overrides_file}")
     ovr_user=$(yq ".etcd_hosts.\"${NAMESPACE}\".user // \"\"" "${overrides_file}")
     ovr_password_env=$(yq ".etcd_hosts.\"${NAMESPACE}\".password_env // \"\"" "${overrides_file}")
     if [[ -n "${ovr_host}" ]]; then
       etcd_host="${ovr_host}"
-      etcd_net="${ovr_net:-host}"
     else
       etcd_host="${default_etcd_host}"
-      etcd_net="bridge"
     fi
     etcd_user="${ovr_user:-${ETCD_USER}}"
     if [[ -n "${ovr_password_env}" ]]; then
@@ -110,20 +107,16 @@ for ((i = 0; i < apps_length; i++)); do
     output_dir="${GITHUB_WORKSPACE}/build-env-output"
     mkdir -p "${output_dir}"
     echo "Fetching etcd key: ${etcd_key}"
-    network_flag=""
-    [[ "${etcd_net}" == "host" ]] && network_flag="--network host"
-    docker run --rm ${network_flag} \
-      -e ETCD_HOST="${etcd_host}" \
-      -e ETCD_USER="${etcd_user}" \
-      -e ETCD_PASSWORD="${etcd_password}" \
-      -e ETCD_KEY="${etcd_key}" \
-      -e APP_NAME="${etcd_name}" \
-      -e NAMESPACE="${NAMESPACE}" \
-      -v "${output_dir}:/output" \
-      ghcr.io/herodotusdev/etcd-pull:0.3 || true
+    ETCD_HOST="${etcd_host}" \
+    ETCD_USER="${etcd_user}" \
+    ETCD_PASSWORD="${etcd_password}" \
+    ETCD_KEY="${etcd_key}" \
+    APP_NAME="${etcd_name}" \
+    NAMESPACE="${NAMESPACE}" \
+    OUTPUT_FILE="${output_dir}/secret.yaml" \
+    bash "${GITHUB_ACTION_PATH}/../etcd-pull/pull.sh" || true
 
     if [[ -s "${output_dir}/secret.yaml" ]]; then
-      sudo chown -R "$(whoami):$(whoami)" "${output_dir}"
       # Truncate: the loop reuses the fixed path for every app.
       out="/tmp/etcd-build-env"
       : > "${out}"

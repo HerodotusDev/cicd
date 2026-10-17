@@ -77,7 +77,7 @@ runs:
           echo "etcd_password=${{ inputs.etcd_password }}" >> "$GITHUB_OUTPUT"
         fi
 
-    - name: Pull and Run Secret Preparation Container
+    - name: Pull and prepare secret
       id: pull
       continue-on-error: true
       env:
@@ -86,19 +86,14 @@ runs:
       shell: bash
       run: |
         set -e
-        NETWORK_FLAG=""
-        if [ "${{ steps.resolve_etcd_host.outputs.docker_network }}" = "host" ]; then
-          NETWORK_FLAG="--network host"
-        fi
-        docker run --rm $NETWORK_FLAG \
-          -e ETCD_HOST="${{ steps.resolve_etcd_host.outputs.host }}" \
-          -e ETCD_USER="${{ steps.resolve_etcd_host.outputs.etcd_user }}" \
-          -e ETCD_PASSWORD="${{ steps.resolve_etcd_host.outputs.etcd_password }}" \
-          -e ETCD_KEY="/${{ inputs.etcd_root }}/${{inputs.k8s_env}}/${{ inputs.app_name }}/.env" \
-          -e APP_NAME="${{ inputs.app_name }}" \
-          -e NAMESPACE="${{ inputs.namespace }}" \
-          -v "${{ github.workspace }}/output:/output" \
-          ghcr.io/herodotusdev/etcd-pull:0.3 || true
+        ETCD_HOST="${{ steps.resolve_etcd_host.outputs.host }}" \
+        ETCD_USER="${{ steps.resolve_etcd_host.outputs.etcd_user }}" \
+        ETCD_PASSWORD="${{ steps.resolve_etcd_host.outputs.etcd_password }}" \
+        ETCD_KEY="/${{ inputs.etcd_root }}/${{inputs.k8s_env}}/${{ inputs.app_name }}/.env" \
+        APP_NAME="${{ inputs.app_name }}" \
+        NAMESPACE="${{ inputs.namespace }}" \
+        OUTPUT_FILE="${{ github.workspace }}/output/secret.yaml" \
+        bash "${{ github.action_path }}/../etcd-pull/pull.sh" || true
 
         if [ ! -s "${{ github.workspace }}/output/secret.yaml" ]; then
           echo "there was no key"
@@ -107,11 +102,6 @@ runs:
           echo "${{ inputs.etcd_root }}/${{inputs.k8s_env}}/${{ inputs.app_name }}/.env"
           echo "no_key=false" >> $GITHUB_OUTPUT
         fi
-
-    - name: Change Ownership of Output Files
-      if: steps.pull.outputs.no_key == 'false'
-      shell: bash
-      run: sudo chown -R "$(whoami):$(whoami)" "${{ github.workspace }}/output"
 
     - name: Set up kubectl
       if: steps.pull.outputs.no_key == 'false'

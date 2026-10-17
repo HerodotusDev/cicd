@@ -81,20 +81,14 @@ runs:
 
         echo "Fetching etcd key: ${ETCD_KEY}"
 
-        NETWORK_FLAG=""
-        if [ "${{ steps.resolve.outputs.docker_network }}" = "host" ]; then
-          NETWORK_FLAG="--network host"
-        fi
-
-        docker run --rm $NETWORK_FLAG \
-          -e ETCD_HOST="${{ steps.resolve.outputs.host }}" \
-          -e ETCD_USER="${{ steps.resolve.outputs.etcd_user }}" \
-          -e ETCD_PASSWORD="${{ steps.resolve.outputs.etcd_password }}" \
-          -e ETCD_KEY="${ETCD_KEY}" \
-          -e APP_NAME="${{ inputs.app_name }}" \
-          -e NAMESPACE="${{ inputs.namespace }}" \
-          -v "${OUTPUT_DIR}:/output" \
-          ghcr.io/herodotusdev/etcd-pull:0.3 || true
+        ETCD_HOST="${{ steps.resolve.outputs.host }}" \
+        ETCD_USER="${{ steps.resolve.outputs.etcd_user }}" \
+        ETCD_PASSWORD="${{ steps.resolve.outputs.etcd_password }}" \
+        ETCD_KEY="${ETCD_KEY}" \
+        APP_NAME="${{ inputs.app_name }}" \
+        NAMESPACE="${{ inputs.namespace }}" \
+        OUTPUT_FILE="${OUTPUT_DIR}/secret.yaml" \
+        bash "${{ github.action_path }}/../etcd-pull/pull.sh" || true
 
         if [ -s "${OUTPUT_DIR}/secret.yaml" ]; then
           echo "no_key=false" >> "$GITHUB_OUTPUT"
