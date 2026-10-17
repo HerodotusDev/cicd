@@ -49,7 +49,9 @@ inputs:
     description: "Kubernetes environment (stg / prod)."
     required: true
   platforms:
-    description: "Comma-separated buildx platforms for every app in the loop (default: linux/amd64,linux/arm64). BuildKit compiles each platform once per shared layer; in-job + GHA caches are keyed per platform. Per-app platform overrides are a parallel-strategy feature only."
+    description: "Single buildx platform this job builds (linux/amd64 or linux/arm64). The workflow runs one sequential job per arch so each platform compiles with the runner's full cores under its own cache scope; a merge job assembles the manifest list. Per-app platforms in cicd-inputs can exclude an arch."
+    required: false
+    default: "linux/amd64"
 
 runs:
   using: "composite"

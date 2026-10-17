@@ -53,7 +53,7 @@ inputs:
     required: false
     default: ""
   platforms:
-    description: "Comma-separated buildx platforms (default: linux/amd64,linux/arm64 — the home cluster schedules onto both amd64 and arm64 nodes). BuildKit stores layer caches per platform under the same scope. To opt an app out of arm64, set platforms: linux/amd64 in its cicd-inputs entry."
+    description: "Single buildx platform to build (linux/amd64 or linux/arm64). The caller (workflow matrix or pre-warm) runs one job per arch on a matching runner; a merge job assembles the manifest list. Tag = <registry>/<app><suffix>:<version>-<arch>."
 
 runs:
   using: "composite"
@@ -95,18 +95,22 @@ runs:
         username: ${{ inputs.registry_username }}
         password: ${{ inputs.registry_password }}
 
-    - name: Set image
+    - name: Set image and arch tag
       shell: bash
       run: |
         echo "IMAGE=${{ inputs.registry }}/${{ inputs.app_name }}${{ inputs.image_suffix }}" >> $GITHUB_ENV
+        case "${{ inputs.platforms }}" in
+          linux/amd64) echo "ARCH=amd64" >> $GITHUB_ENV ;;
+          linux/arm64) echo "ARCH=arm64" >> $GITHUB_ENV ;;
+          *) echo "::error::unsupported platform '${{ inputs.platforms }}' (expected linux/amd64 or linux/arm64)"; exit 1 ;;
+        esac
 
-
-    - name: Check if Docker image exists
+    - name: Check if arch image exists
       id: check_image
       shell: bash
-      
+
       run: |
-        image="${{ env.IMAGE }}:${{ inputs.version }}"
+        image="${{ env.IMAGE }}:${{ inputs.version }}-${{ env.ARCH }}"
         if docker manifest inspect "$image" >/dev/null 2>&1; then
           echo "Docker image '$image' exists."
           echo "image_exists=true" >> "$GITHUB_OUTPUT"
@@ -137,11 +141,10 @@ runs:
         file: ./docker/Dockerfile.${{ steps.overrides.outputs.dockerfile }}
         platforms: ${{ inputs.platforms }}
         push: true
-        cache-from: type=gha${{ inputs.cache_scope != '' && format(',scope={0}', inputs.cache_scope) || '' }}
-        cache-to: type=gha,mode=${{ inputs.cache_mode }}${{ inputs.cache_scope != '' && format(',scope={0}', inputs.cache_scope) || '' }}
+        cache-from: type=gha,scope=${{ inputs.app_name }}-${{ env.ARCH }}${{ inputs.cache_scope != '' && format('-{0}', inputs.cache_scope) || '' }}
+        cache-to: type=gha,mode=${{ inputs.cache_mode }},scope=${{ inputs.app_name }}-${{ env.ARCH }}${{ inputs.cache_scope != '' && format('-{0}', inputs.cache_scope) || '' }}
         network: host
         tags: |
-          ${{ env.IMAGE }}:latest
-          ${{ env.IMAGE }}:${{ inputs.version }}
+          ${{ env.IMAGE }}:${{ inputs.version }}-${{ env.ARCH }}
         build-args: |
           APP_NAME=${{ steps.overrides.outputs.app_arg }}

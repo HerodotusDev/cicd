@@ -1,0 +1,102 @@
+---
+name: "Merge per-arch images into manifest lists"
+description: >
+  Assembles the multi-arch manifest list for every app from the per-arch tags
+  (<image>:<version>-amd64 / -arm64) pushed by the per-arch build jobs, and
+  tags it <image>:<version> + <image>:latest — the tags the deploy jobs apply.
+  Per-app `platforms` from cicd-inputs decides which arches go into each list.
+  Idempotent: skips apps whose list already carries all their platforms.
+
+inputs:
+  registry:
+    description: "Image repository prefix incl. registry host (e.g. ghcr.io/herodotusdev)."
+    required: true
+  registry_host:
+    description: "Registry host for docker login (e.g. ghcr.io)."
+    required: true
+  image_suffix:
+    description: "Image name suffix for the target environment ('-prod' or '-stg')."
+    required: false
+    default: ""
+  matrix_deploy:
+    description: "JSON array of deploy apps (define-matrix matrix_deploy output)."
+    required: true
+  matrix_init:
+    description: "JSON array of init apps (define-matrix matrix_init output). Init apps reusing another app's image (image != name) are skipped — already covered."
+    required: true
+  app_versions:
+    description: "JSON map of app name to resolved version (define-matrix app_versions output)."
+    required: true
+  registry_username:
+    description: "Registry login (github.actor for ghcr)."
+    required: true
+  registry_password:
+    description: "Registry password (github.token for ghcr; needs packages:write)."
+
+runs:
+  using: "composite"
+  steps:
+    - name: Log in to Docker Registry
+      uses: docker/login-action@v3
+      with:
+        registry: ${{ inputs.registry_host }}
+        username: ${{ inputs.registry_username }}
+        password: ${{ inputs.registry_password }}
+
+    - name: Set up Docker Buildx (imagetools)
+      uses: docker/setup-buildx-action@v3
+
+    - name: Merge manifest lists
+      shell: bash
+      env:
+        REGISTRY: ${{ inputs.registry }}
+        IMAGE_SUFFIX: ${{ inputs.image_suffix }}
+        MATRIX_DEPLOY: ${{ inputs.matrix_deploy }}
+        MATRIX_INIT: ${{ inputs.matrix_init }}
+        APP_VERSIONS: ${{ inputs.app_versions }}
+      run: |
+        set -euo pipefail
+        # Deploy apps + self-built init apps; init apps reusing another image
+        # are covered by that app's list.
+        apps=$(printf '%s\n%s' "${MATRIX_DEPLOY}" "${MATRIX_INIT}" | jq -s '
+          map(.[]) | map(select(.name != "__no_init__"))
+          | map(select((.image // .name) == .name))
+          | unique_by(.name)')
+        count=$(printf '%s' "${apps}" | jq 'length')
+        echo "Merging manifest lists for ${count} image(s)."
+
+        for i in $(seq 0 $((count - 1))); do
+          app=$(printf '%s' "${apps}" | jq -c ".[${i}]")
+          name=$(printf '%s' "${app}" | jq -r '.name')
+          version=$(printf '%s' "${APP_VERSIONS}" | jq -r --arg n "${name}" '.[$n]')
+          image="${REGISTRY}/${name}${IMAGE_SUFFIX}"
+          # Apps default to both arches; cicd-inputs platforms can restrict.
+          platforms=$(printf '%s' "${app}" | jq -r '.platforms // "linux/amd64,linux/arm64"')
+
+          sources=()
+          [[ "${platforms}" == *"linux/amd64"* ]] && sources+=("${image}:${version}-amd64")
+          [[ "${platforms}" == *"linux/arm64"* ]] && sources+=("${image}:${version}-arm64")
+          if [[ ${#sources[@]} -eq 0 ]]; then
+            echo "::warning::${name}: no platforms resolved (${platforms}) — skipping."
+            continue
+          fi
+
+          # Skip when the list already exists and carries every platform.
+          if docker buildx imagetools inspect "${image}:${version}" 2>/dev/null | grep -q 'Platform:'; then
+            missing=0
+            for p in "${sources[@]}"; do
+              arch="${p##*-}"
+              docker buildx imagetools inspect "${image}:${version}" | grep -q "Platform:.*linux/${arch}" || missing=1
+            done
+            if [[ ${missing} -eq 0 ]]; then
+              echo "${image}:${version} already lists all platforms. Skipping."
+              continue
+            fi
+          fi
+
+          echo "Creating manifest list ${image}:${version} (+ :latest) from: ${sources[*]}"
+          args=(-t "${image}:${version}" -t "${image}:latest")
+          for s in "${sources[@]}"; do args+=("${s}"); done
+          docker buildx imagetools create "${args[@]}"
+        done
+        echo "Manifest lists merged."

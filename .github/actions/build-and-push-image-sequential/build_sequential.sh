@@ -6,6 +6,10 @@
 # every subsequent build reuses them from the in-job builder cache instead of
 # recompiling per matrix job. Fails fast on the first build failure.
 #
+# One invocation builds ONE platform (the workflow runs this job once per
+# arch, amd64 and arm64, so each platform gets the runner's full cores and its
+# own cache scope); a separate merge job assembles the manifest list.
+#
 # Per-app behavior replicates the parallel path; keep these in sync:
 #   - .github/actions/build-and-push-image/action.yaml (checkout, login, IMAGE,
 #     tag-exists skip, overrides, .env injection, build-push args)
@@ -26,13 +30,19 @@ overrides_file="${GITHUB_ACTION_PATH}/../resolve-overrides/overrides.yaml"
 repo="${GITHUB_REPOSITORY}"
 default_etcd_host="http://etcd.etcd.svc.cluster.local:2379"
 
+platform="${PLATFORMS:-linux/amd64}"
+case "${platform}" in
+  linux/amd64) arch="amd64" ;;
+  linux/arm64) arch="arm64" ;;
+  *) echo "❌ Error: unsupported platform '${platform}' (expected linux/amd64 or linux/arm64)." >&2; exit 1 ;;
+esac
+
 apps_length=$(printf '%s' "${MATRIX_DEPLOY:-[]}" | jq 'length')
 if [[ "${apps_length}" -eq 0 ]]; then
   echo "No deploy apps requested. Nothing to build."
   exit 0
 fi
-platforms="${PLATFORMS:-linux/amd64,linux/arm64}"
-echo "Sequential build: ${apps_length} app(s) in one buildx context (platforms: ${platforms})."
+echo "Sequential build: ${apps_length} app(s) in one buildx context (platform: ${platform})."
 
 for ((i = 0; i < apps_length; i++)); do
   app=$(printf '%s' "${MATRIX_DEPLOY}" | jq -c ".[${i}]")
@@ -41,6 +51,12 @@ for ((i = 0; i < apps_length; i++)); do
   if [[ -z "${version}" || "${version}" == "null" ]]; then
     echo "❌ Error: No resolved version for app '${name}'." >&2
     exit 1
+  fi
+  app_platforms=$(printf '%s' "${app}" | jq -r '.platforms // "linux/amd64,linux/arm64"')
+  if [[ "${app_platforms}" != *"linux/${arch}"* ]]; then
+    echo "${name}: platforms '${app_platforms}' exclude linux/${arch}. Skipping."
+    echo "::endgroup::"
+    continue
   fi
   dockerfile_default=$(printf '%s' "${app}" | jq -r '.dockerfile // .name')
   context=$(printf '%s' "${app}" | jq -r '.context // "."')
@@ -52,6 +68,7 @@ for ((i = 0; i < apps_length; i++)); do
   echo "::group::[$((i + 1))/${apps_length}] ${name} (version ${version})"
 
   image="${REGISTRY}/${name}${IMAGE_SUFFIX}"
+  arch_tag="${image}:${version}-${arch}"
 
   # resolve-overrides: repo dockerfile override + APP_NAME strip prefix.
   dockerfile=$(yq ".repos.\"${repo}\".dockerfile // \"\"" "${overrides_file}")
@@ -61,9 +78,9 @@ for ((i = 0; i < apps_length; i++)); do
   [[ -n "${strip}" ]] && app_base="${name#"${strip}"}"
   app_arg="app-${app_base}"
 
-  # Skip when the version tag already exists on the registry.
-  if docker manifest inspect "${image}:${version}" >/dev/null 2>&1; then
-    echo "Docker image '${image}:${version}' exists. Skipping."
+  # Skip when the per-arch version tag already exists on the registry.
+  if docker manifest inspect "${arch_tag}" >/dev/null 2>&1; then
+    echo "Docker image '${arch_tag}' exists. Skipping."
     echo "::endgroup::"
     continue
   fi
@@ -149,23 +166,26 @@ for ((i = 0; i < apps_length; i++)); do
     fi
   fi
 
-  cache_from="type=gha"
-  cache_to="type=gha,mode=${cache_mode}"
+  # Cache scope is per app + per arch so neither platform's layers evict the
+  # other's (BuildKit stores layer caches keyed per platform, but distinct
+  # scopes keep the GHA cache bucket small per restore). Matches the scope
+  # convention in build-and-push-image/action.yaml.
+  cache_from="type=gha,scope=${name}-${arch}"
+  cache_to="type=gha,mode=${cache_mode},scope=${name}-${arch}"
   if [[ -n "${cache_scope}" ]]; then
-    cache_from="type=gha,scope=${cache_scope}"
-    cache_to="type=gha,mode=${cache_mode},scope=${cache_scope}"
+    cache_from="type=gha,scope=${cache_scope}-${arch}"
+    cache_to="type=gha,mode=${cache_mode},scope=${cache_scope}-${arch}"
   fi
 
-  echo "Building ${image}:${version} (dockerfile ./docker/Dockerfile.${dockerfile}, APP_NAME=${app_arg}, platforms ${platforms})"
+  echo "Building ${arch_tag} (dockerfile ./docker/Dockerfile.${dockerfile}, APP_NAME=${app_arg}, platform ${platform})"
   docker buildx build \
     --push \
-    --platform "${platforms}" \
+    --platform "${platform}" \
     --file "./docker/Dockerfile.${dockerfile}" \
     --cache-from "${cache_from}" \
     --cache-to "${cache_to}" \
     --network host \
-    --tag "${image}:latest" \
-    --tag "${image}:${version}" \
+    --tag "${arch_tag}" \
     --build-arg "APP_NAME=${app_arg}" \
     "${context}"
 

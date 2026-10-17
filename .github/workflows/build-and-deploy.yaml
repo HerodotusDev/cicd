@@ -52,6 +52,7 @@ jobs:
       app_versions: ${{ steps.build-matrix.outputs.app_versions }}
       primary_version: ${{ steps.build-matrix.outputs.primary_version }}
       unique_versions: ${{ steps.build-matrix.outputs.unique_versions }}
+      has_etcd: ${{ steps.detect-etcd.outputs.has_etcd }}
     steps:
       - name: Checkout caller repo
         uses: HerodotusDev/cicd/.github/actions/checkout-repo@new-main
@@ -74,13 +75,27 @@ jobs:
           default_version_file: ${{ env.version_file }}
           default_version_key: ${{ env.version_key }}
 
+      - name: Detect etcd build-env apps
+        id: detect-etcd
+        run: |
+          has_etcd=$(printf '%s' '${{ needs.define-matrix.outputs.matrix_deploy }}' | jq '[.[] | select((.etcd_build_env // false) == true)] | length > 0')
+          echo "has_etcd=${has_etcd}" >> "$GITHUB_OUTPUT"
+        shell: bash
+
   build-and-push-image:
     if: inputs.build-strategy != 'sequential'
     needs: [define-matrix]
-    runs-on: ubuntu-latest
+    runs-on: ${{ matrix.arch == 'arm64' && 'ubuntu-24.04-arm' || 'ubuntu-latest' }}
+    # One WG peer per repo: when any app pulls build env from etcd, the tunnel
+    # must not have concurrent sessions, so builds serialize; otherwise they
+    # fan out.
     strategy:
+      max-parallel: ${{ needs.define-matrix.outputs.has_etcd == 'true' && 1 || 8 }}
       matrix:
+        arch: [amd64, arm64]
         app: ${{ fromJson(needs.define-matrix.outputs.matrix_deploy) }}
+    # Per-app platforms opt-out (cicd-inputs): skip arch jobs the app excludes.
+    if: contains(matrix.app.platforms || 'linux/amd64,linux/arm64', format('linux/{0}', matrix.arch))
     steps:
       - name: Checkout caller repo
         uses: HerodotusDev/cicd/.github/actions/checkout-repo@new-main
@@ -132,12 +147,19 @@ jobs:
           build_env_file: ${{ steps.build-env.outputs.env_file }}
           cache_mode: ${{ matrix.app.cache_mode || 'max' }}
           cache_scope: ${{ matrix.app.cache_scope || '' }}
-          platforms: ${{ matrix.app.platforms || 'linux/amd64,linux/arm64' }}
+          platforms: ${{ format('linux/{0}', matrix.arch) }}
 
   build-and-push-image-sequential:
     if: inputs.build-strategy == 'sequential'
     needs: [define-matrix]
-    runs-on: ubuntu-latest
+    # One job per arch: each platform compiles with the runner's full cores
+    # under its own per-arch cache scope (sharing one job made the platforms
+    # contend for 2 cores and pushed cold builds past the job limit).
+    runs-on: ${{ matrix.arch == 'arm64' && 'ubuntu-24.04-arm' || 'ubuntu-latest' }}
+    timeout-minutes: 355
+    strategy:
+      matrix:
+        arch: [amd64, arm64]
     steps:
       - name: Checkout caller repo
         uses: HerodotusDev/cicd/.github/actions/checkout-repo@new-main
@@ -184,13 +206,16 @@ jobs:
           etcd_user: ${{ env.ETCD_USER }}
           etcd_password: ${{ env.ETCD_PASSWORD }}
           k8s_env: ${{ env.k8s_env }}
+          platforms: ${{ format('linux/{0}', matrix.arch) }}
 
   build-and-push-init:
     needs: [define-matrix]
-    runs-on: ubuntu-latest
+    runs-on: ${{ matrix.arch == 'arm64' && 'ubuntu-24.04-arm' || 'ubuntu-latest' }}
     strategy:
       matrix:
+        arch: [amd64, arm64]
         app: ${{ fromJson(needs.define-matrix.outputs.matrix_init) }}
+    if: contains(matrix.app.platforms || 'linux/amd64,linux/arm64', format('linux/{0}', matrix.arch))
     steps:
       - name: Skip init pod build
         if: ${{ matrix.app.name == '__no_init__' }}
@@ -230,11 +255,28 @@ jobs:
           submodules: ${{ inputs.submodules }}
           cache_mode: ${{ matrix.app.cache_mode || 'max' }}
           cache_scope: ${{ matrix.app.cache_scope || '' }}
-          platforms: ${{ matrix.app.platforms || 'linux/amd64,linux/arm64' }}
+          platforms: ${{ format('linux/{0}', matrix.arch) }}
+
+  merge-manifests:
+    needs: [define-matrix, build-and-push-image, build-and-push-image-sequential, build-and-push-init]
+    if: ${{ !cancelled() && needs.define-matrix.result == 'success' && (needs.build-and-push-image.result == 'success' || needs.build-and-push-image-sequential.result == 'success') && needs.build-and-push-init.result == 'success' }}
+    runs-on: ubuntu-latest
+    steps:
+      - name: Merge per-arch images into manifest lists
+        uses: HerodotusDev/cicd/.github/actions/merge-manifests@new-main
+        with:
+          registry: ${{ env.registry }}
+          registry_host: ${{ env.registry_host }}
+          image_suffix: ${{ env.image_suffix }}
+          matrix_deploy: ${{ needs.define-matrix.outputs.matrix_deploy }}
+          matrix_init: ${{ needs.define-matrix.outputs.matrix_init }}
+          app_versions: ${{ needs.define-matrix.outputs.app_versions }}
+          registry_username: ${{ github.actor }}
+          registry_password: ${{ github.token }}
 
   create-git-tag:
-    needs: [define-matrix, build-and-push-image, build-and-push-image-sequential]
-    if: ${{ !cancelled() && needs.define-matrix.result == 'success' && (needs.build-and-push-image.result == 'success' || needs.build-and-push-image-sequential.result == 'success') }}
+    needs: [define-matrix, merge-manifests]
+    if: ${{ !cancelled() && needs.define-matrix.result == 'success' && needs.merge-manifests.result == 'success' }}
     runs-on: ubuntu-latest
     steps:
       - name: Checkout caller repo
@@ -256,8 +298,8 @@ jobs:
           token: ${{ secrets.GITHUB_TOKEN }}
 
   deploy-init-pods:
-    needs: [define-matrix, create-git-tag, build-and-push-image, build-and-push-image-sequential, build-and-push-init]
-    if: ${{ !cancelled() && needs.define-matrix.result == 'success' && needs.create-git-tag.result == 'success' && (needs.build-and-push-image.result == 'success' || needs.build-and-push-image-sequential.result == 'success') && needs.build-and-push-init.result == 'success' }}
+    needs: [define-matrix, create-git-tag, merge-manifests]
+    if: ${{ !cancelled() && needs.define-matrix.result == 'success' && needs.create-git-tag.result == 'success' && needs.merge-manifests.result == 'success' }}
     runs-on: ubuntu-latest
     # One WG peer per org: tunnel sessions must not overlap (WireGuard moves
     # the session on every handshake), so tunnel-using matrix jobs run serially.
@@ -305,8 +347,8 @@ jobs:
           image_name: ${{ matrix.app.image }}
 
   deploy:
-    needs: [define-matrix, create-git-tag, build-and-push-image, build-and-push-image-sequential, deploy-init-pods]
-    if: ${{ !cancelled() && needs.define-matrix.result == 'success' && needs.create-git-tag.result == 'success' && (needs.build-and-push-image.result == 'success' || needs.build-and-push-image-sequential.result == 'success') && needs.deploy-init-pods.result == 'success' }}
+    needs: [define-matrix, create-git-tag, merge-manifests]
+    if: ${{ !cancelled() && needs.define-matrix.result == 'success' && needs.create-git-tag.result == 'success' && needs.merge-manifests.result == 'success' }}
     runs-on: ubuntu-latest
     # One WG peer per org: tunnel sessions must not overlap (WireGuard moves
     # the session on every handshake), so tunnel-using matrix jobs run serially.
