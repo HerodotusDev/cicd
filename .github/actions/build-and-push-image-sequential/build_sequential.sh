@@ -120,7 +120,7 @@ for ((i = 0; i < apps_length; i++)); do
       -e APP_NAME="${etcd_name}" \
       -e NAMESPACE="${NAMESPACE}" \
       -v "${output_dir}:/output" \
-      dataprocessor/etcd-pull:0.2 || true
+      ghcr.io/herodotusdev/etcd-pull:0.3 || true
 
     if [[ -s "${output_dir}/secret.yaml" ]]; then
       sudo chown -R "$(whoami):$(whoami)" "${output_dir}"

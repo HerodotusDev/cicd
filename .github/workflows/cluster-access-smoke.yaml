@@ -80,7 +80,7 @@ jobs:
             -e APP_NAME="smoke-probe" \
             -e NAMESPACE="daloc-prod" \
             -v "${{ github.workspace }}/output:/output" \
-            dataprocessor/etcd-pull:0.2
+            ghcr.io/herodotusdev/etcd-pull:0.3
           # 3. Verify the rendered secret carries the probe value.
           decoded=$(grep -A1 '^data:' output/secret.yaml | grep 'SMOKE:' | awk '{print $2}' | base64 -d)
           [ "${decoded}" = "ok" ] || { echo "::error::unexpected probe value: ${decoded}"; exit 1; }

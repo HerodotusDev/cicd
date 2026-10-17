@@ -98,7 +98,7 @@ runs:
           -e APP_NAME="${{ inputs.app_name }}" \
           -e NAMESPACE="${{ inputs.namespace }}" \
           -v "${{ github.workspace }}/output:/output" \
-          dataprocessor/etcd-pull:0.2 || true
+          ghcr.io/herodotusdev/etcd-pull:0.3 || true
 
         if [ ! -s "${{ github.workspace }}/output/secret.yaml" ]; then
           echo "there was no key"

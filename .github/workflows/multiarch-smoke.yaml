@@ -48,6 +48,15 @@ jobs:
           context: .github/smoke
           platforms: ${{ format('linux/{0}', matrix.arch) }}
 
+      - name: Execute the built image on its native arch
+        run: |
+          set -euo pipefail
+          expected=${{ matrix.arch == 'arm64' && 'aarch64' || 'x86_64' }}
+          out=$(docker run --rm "ghcr.io/herodotusdev/cicd-smoke-multiarch:${{ github.run_id }}-${{ matrix.arch }}")
+          echo "${out}"
+          [ "${out}" = "arch=${expected}" ] || { echo "::error::unexpected output: ${out} (expected arch=${expected})"; exit 1; }
+        shell: bash
+
   merge:
     needs: [build]
     runs-on: ubuntu-latest
@@ -71,12 +80,4 @@ jobs:
           docker buildx imagetools inspect "${{ env.image }}:${{ github.run_id }}" | tee /dev/stderr | grep -q "Platform:.*linux/arm64"
           docker buildx imagetools inspect "${{ env.image }}:${{ github.run_id }}" | grep -q "Platform:.*linux/amd64"
           echo "manifest list OK: amd64 + arm64"
-        shell: bash
-
-      - name: Execute the arm64 variant from the merged list
-        run: |
-          set -euo pipefail
-          out=$(docker run --rm --platform linux/arm64 "${{ env.image }}:${{ github.run_id }}")
-          echo "${out}"
-          [ "${out}" = "arch=aarch64" ] || { echo "::error::unexpected arm64 output: ${out}"; exit 1; }
         shell: bash

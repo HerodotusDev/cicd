@@ -94,7 +94,7 @@ runs:
           -e APP_NAME="${{ inputs.app_name }}" \
           -e NAMESPACE="${{ inputs.namespace }}" \
           -v "${OUTPUT_DIR}:/output" \
-          dataprocessor/etcd-pull:0.2 || true
+          ghcr.io/herodotusdev/etcd-pull:0.3 || true
 
         if [ -s "${OUTPUT_DIR}/secret.yaml" ]; then
           echo "no_key=false" >> "$GITHUB_OUTPUT"
