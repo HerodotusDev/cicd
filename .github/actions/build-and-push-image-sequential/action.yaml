@@ -80,12 +80,6 @@ runs:
       with:
         install: true
 
-    - name: Set up QEMU (binfmt for arm64)
-      if: contains(inputs.platforms, 'arm64')
-      uses: docker/setup-qemu-action@v3
-      with:
-        platforms: arm64
-
     - name: Build and push images
       shell: bash
       env:

@@ -19,7 +19,7 @@ app_names:
     #                               #   app's image is injected into the pod manifest. defaults to app name.
     # cache_mode: max                # optional. GHA cache export mode (min = final layers only, max = all stages).
     # cache_scope: my-scope          # optional. custom GHA cache scope key.
-    # platforms: linux/amd64,linux/arm64  # optional. defaults to both. use "linux/amd64" to opt out of arm64 (parallel strategy only).
+    # platforms: linux/amd64,linux/arm64  # optional. defaults to both. restrict with e.g. "linux/amd64".
   - "example2"                      # plain strings pick up all defaults.
 
 

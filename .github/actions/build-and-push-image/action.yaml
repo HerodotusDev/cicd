@@ -58,12 +58,6 @@ inputs:
 runs:
   using: "composite"
   steps:
-    - name: Set up QEMU (binfmt for arm64)
-      if: contains(inputs.platforms, 'arm64')
-      uses: docker/setup-qemu-action@v3
-      with:
-        platforms: arm64
-
     - name: Checkout code
       uses: actions/checkout@v4
       with:
@@ -127,7 +121,7 @@ runs:
 
     - name: Resolve consumer overrides
       id: overrides
-      uses: HerodotusDev/cicd/.github/actions/resolve-overrides@main
+      uses: HerodotusDev/cicd/.github/actions/resolve-overrides@new-main
       with:
         repository: ${{ github.repository }}
         app_name: ${{ inputs.app_name }}

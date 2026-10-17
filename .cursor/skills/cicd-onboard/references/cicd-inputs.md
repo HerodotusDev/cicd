@@ -45,7 +45,7 @@ app_names:
 | `etcd_build_env` | `false` | Pull a `.env` from etcd at **build time** and inject it as `.env.production` into the build context (see config reference). |
 | `cache_mode` | `max` | BuildKit GHA cache export mode passed to `cache-to`: `min` (final image layers only) or `max` (all intermediate stages). |
 | `cache_scope` | *(default BuildKit scope)* | Optional GHA cache scope key. Set per app so matrix builds do not overwrite each other's cache buckets. |
-| `platforms` | `linux/amd64,linux/arm64` | Buildx platforms for the image. The home cluster schedules onto both amd64 (`ms`) and arm64 (RPi) nodes, so images ship as multi-arch manifest lists by default. Opt an app out with `platforms: linux/amd64` (parallel build strategy only). |
+| `platforms` | `linux/amd64,linux/arm64` | Architectures built for the image (comma list). The home cluster schedules onto both amd64 (`ms`) and arm64 (RPi) nodes, so images ship as multi-arch manifest lists by default. Restrict with e.g. `platforms: linux/amd64` — excluded arches skip both build and merge. |
 
 ## Version resolution
 

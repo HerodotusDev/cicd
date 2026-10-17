@@ -1,10 +1,9 @@
 # Smoke test for the multi-arch build path (side branch).
-# Proves on a real GH runner: buildx + QEMU can build linux/amd64 + linux/arm64
-# in one invocation, push a manifest list to ghcr, and the arm64 variant
-# actually executes (emulated). Guards the path every consumer build relies on
-# once images must run on both amd64 (ms) and arm64 (RPi) home-cluster nodes.
-# Skips the registry checks until org settings allow GITHUB_TOKEN package
-# pushes; build-only validation still runs.
+# Exercises the real per-arch machinery on every push touching the build
+# actions: build-and-push-image per arch on matching runners (amd64 on
+# ubuntu-latest, arm64 on ubuntu-24.04-arm) pushing <tag>-<arch> tags, then
+# merge-manifests assembling the list — the exact jobs consumer builds run.
+# The final check executes the arm64 variant from the merged list.
 name: Multi-arch build smoke
 
 on:
@@ -15,8 +14,10 @@ on:
     paths:
       - ".github/workflows/multiarch-smoke.yaml"
       - ".github/smoke/**"
+      - "docker/Dockerfile.smoke-multiarch"
       - ".github/actions/build-and-push-image/**"
       - ".github/actions/build-and-push-image-sequential/**"
+      - ".github/actions/merge-manifests/**"
 
 permissions:
   contents: read
@@ -26,51 +27,56 @@ env:
   image: ghcr.io/herodotusdev/cicd-smoke-multiarch
 
 jobs:
-  smoke:
+  build:
+    runs-on: ${{ matrix.arch == 'arm64' && 'ubuntu-24.04-arm' || 'ubuntu-latest' }}
+    strategy:
+      matrix:
+        arch: [amd64, arm64]
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Build and push per-arch image
+        uses: HerodotusDev/cicd/.github/actions/build-and-push-image@new-main
+        with:
+          registry: ghcr.io/herodotusdev
+          registry_host: ghcr.io
+          app_name: cicd-smoke-multiarch
+          version: ${{ github.run_id }}
+          registry_username: ${{ github.actor }}
+          registry_password: ${{ github.token }}
+          dockerfile: smoke-multiarch
+          context: .github/smoke
+          platforms: ${{ format('linux/{0}', matrix.arch) }}
+
+  merge:
+    needs: [build]
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
 
-      - name: Set up QEMU
-        uses: docker/setup-qemu-action@v3
+      - name: Merge per-arch images into manifest list
+        uses: HerodotusDev/cicd/.github/actions/merge-manifests@new-main
         with:
-          platforms: arm64
+          registry: ghcr.io/herodotusdev
+          registry_host: ghcr.io
+          matrix_deploy: '[{"name": "cicd-smoke-multiarch"}]'
+          matrix_init: "[]"
+          app_versions: '{"cicd-smoke-multiarch": "${{ github.run_id }}"}'
+          registry_username: ${{ github.actor }}
+          registry_password: ${{ github.token }}
 
-      - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v3
-
-      - name: Log in to ghcr
-        uses: docker/login-action@v3
-        with:
-          registry: ghcr.io
-          username: ${{ github.actor }}
-          password: ${{ github.token }}
-
-      - name: Build and push multi-arch image
-        uses: docker/build-push-action@v6
-        with:
-          context: .github/smoke
-          file: .github/smoke/Dockerfile.multiarch
-          platforms: linux/amd64,linux/arm64
-          push: true
-          tags: ${{ env.image }}:smoke
-          cache-from: type=gha,scope=smoke-multiarch
-          cache-to: type=gha,mode=max,scope=smoke-multiarch
-
-      - name: Verify manifest list carries both platforms
+      - name: Verify merged list carries both platforms
         run: |
           set -euo pipefail
-          inspect=$(docker buildx imagetools inspect "${{ env.image }}:smoke")
-          echo "${inspect}"
-          echo "${inspect}" | grep -q "Platform: *linux/amd64" || { echo "::error::linux/amd64 missing from manifest list"; exit 1; }
-          echo "${inspect}" | grep -q "Platform: *linux/arm64" || { echo "::error::linux/arm64 missing from manifest list"; exit 1; }
+          docker buildx imagetools inspect "${{ env.image }}:${{ github.run_id }}" | tee /dev/stderr | grep -q "Platform:.*linux/arm64"
+          docker buildx imagetools inspect "${{ env.image }}:${{ github.run_id }}" | grep -q "Platform:.*linux/amd64"
           echo "manifest list OK: amd64 + arm64"
         shell: bash
 
-      - name: Execute the arm64 variant (QEMU)
+      - name: Execute the arm64 variant from the merged list
         run: |
           set -euo pipefail
-          out=$(docker run --rm --platform linux/arm64 "${{ env.image }}:smoke")
+          out=$(docker run --rm --platform linux/arm64 "${{ env.image }}:${{ github.run_id }}")
           echo "${out}"
           [ "${out}" = "arch=aarch64" ] || { echo "::error::unexpected arm64 output: ${out}"; exit 1; }
         shell: bash

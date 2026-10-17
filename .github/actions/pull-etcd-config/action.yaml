@@ -46,7 +46,7 @@ runs:
   steps:
     - name: Resolve consumer overrides
       id: overrides
-      uses: HerodotusDev/cicd/.github/actions/resolve-overrides@main
+      uses: HerodotusDev/cicd/.github/actions/resolve-overrides@new-main
       with:
         namespace: ${{ inputs.namespace }}
 

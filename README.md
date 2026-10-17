@@ -58,13 +58,11 @@ tools/install-skill.sh --help   # full usage
 Once installed, ask the agent to onboard the repo and it follows the skill.
 
 ## Multi-arch builds
-Images build for `linux/amd64` + `linux/arm64` in one `docker buildx build` on the amd64 runner: arm64 compiles under QEMU (`docker/setup-qemu-action`), and BuildKit pushes a single manifest list, so no merge job exists and `docker manifest inspect` tag-skip logic works unchanged. Kubernetes never needs arch hints — the kubelet resolves the platform from the list.
+Images build per arch in parallel matrix jobs — `linux/amd64` on `ubuntu-latest`, `linux/arm64` on the native `ubuntu-24.04-arm` runner (billed at $0.005/min, cheaper than the x64 runners) — and push per-arch tags `<image>:<version>-<arch>`. A `merge-manifests` job then assembles `<image>:<version>` + `:latest` as a manifest list, which is what the deploy jobs apply; the kubelet resolves the platform per node, so Kubernetes never needs arch hints.
 
-Caching is per platform within the same BuildKit GHA cache scope: amd64 and arm64 layers are stored/restored independently, so a code-only change re-runs only the compile layer of the changed arch. First build after cache eviction is the slow one (a cold arm64 Rust workspace build under QEMU can take hours); steady-state small diffs stay fast because dependency layers (`cargo-chef cook`, node_modules) are cached per arch.
+Caching is per app AND per arch (`type=gha,scope=<app>-<arch>`): amd64 and arm64 layers are stored/restored independently, so a code-only change re-runs only the compile layer of the changed arch. Dependency layers (`cargo-chef cook`, `bun install`) are cached per arch; a cold build of the daloc Rust workspace compiles in ~15 min per arch, warm builds faster. Per-app `platforms` in `cicd-inputs` excludes an arch from both build and merge.
 
-Per-app controls (`k8s/cicd-inputs.yaml`, parallel strategy): `platforms: linux/amd64` opts an app out of arm64. Sequential strategy builds every app for both platforms in one buildx context (the shared-compile trick holds per platform).
-
-Dockerfile requirements: base images (`FROM ...`) must be multi-arch manifests (all official rust/debian/node/bun images are) and must not hardcode `x86_64` paths or tools. `.github/workflows/multiarch-smoke.yaml` proves the path on every push touching the build actions.
+Dockerfile requirements: base images (`FROM ...`) must be multi-arch manifests (all official rust/debian/node/bun images are) and must not hardcode `x86_64` paths or tools. `.github/workflows/multiarch-smoke.yaml` exercises the per-arch build + merge path on every push touching the build actions.
 
 ## Etcd configuration
 Upload the configuration file to etcd before the workflow runs. The workflow reads `/etcd_root/k8s_env/app_name/.env` and writes it into `<app_name>-secret`.

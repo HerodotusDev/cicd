@@ -1,0 +1,9 @@
+# Multi-arch smoke image: exercises the pipeline's per-arch build + manifest
+# merge path on a real runner pair (amd64 job on ubuntu-latest, arm64 job on
+# ubuntu-24.04-arm). Built by .github/workflows/multiarch-smoke.yaml via the
+# real build-and-push-image composite action (context = .github/smoke, which
+# carries entry.sh; no RUN at build time — busybox is the official multi-arch
+# base, so both platforms resolve to native binaries).
+FROM busybox:1.37
+COPY entry.sh /entry.sh
+ENTRYPOINT ["/bin/sh", "/entry.sh"]
