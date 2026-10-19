@@ -75,7 +75,8 @@ jobs:
           default_version_key: ${{ env.version_key }}
 
   build-and-push-image:
-    if: inputs.build-strategy != 'sequential'
+    # Per-app platforms opt-out (cicd-inputs): skip arch jobs the app excludes.
+    if: inputs.build-strategy != 'sequential' && contains(matrix.app.platforms || 'linux/amd64,linux/arm64', format('linux/{0}', matrix.arch))
     needs: [define-matrix]
     runs-on: ${{ matrix.arch == 'arm64' && 'ubuntu-24.04-arm' || 'ubuntu-latest' }}
     # One WG peer per repo: builds that pull etcd config use the tunnel and
@@ -88,8 +89,6 @@ jobs:
       matrix:
         arch: [amd64, arm64]
         app: ${{ fromJson(needs.define-matrix.outputs.matrix_deploy) }}
-    # Per-app platforms opt-out (cicd-inputs): skip arch jobs the app excludes.
-    if: contains(matrix.app.platforms || 'linux/amd64,linux/arm64', format('linux/{0}', matrix.arch))
     steps:
       - name: Checkout caller repo
         uses: HerodotusDev/cicd/.github/actions/checkout-repo@new-main
