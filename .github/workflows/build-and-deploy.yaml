@@ -282,6 +282,19 @@ jobs:
     if: ${{ !cancelled() && needs.define-matrix.result == 'success' && (needs.build-and-push-image.result == 'success' || needs.build-and-push-image-sequential.result == 'success') && needs.build-and-push-init.result == 'success' }}
     runs-on: ubuntu-latest
     steps:
+      # env.image_suffix / env.k8s_env are job-scoped (set by load-inputs in
+      # the build jobs); the merge job needs its own load to see them.
+      - name: Checkout caller repo
+        uses: HerodotusDev/cicd/.github/actions/checkout-repo@new-main
+        with:
+          token: ${{ secrets.SUBMODULES_PAT || secrets.GITHUB_TOKEN }}
+
+      - name: Load Inputs from YAML
+        id: load-inputs
+        uses: HerodotusDev/cicd/.github/actions/load-inputs@new-main
+        with:
+          inputs_file: ${{ env.inputs_files }}
+
       - name: Merge per-arch images into manifest lists
         uses: HerodotusDev/cicd/.github/actions/merge-manifests@new-main
         with:
