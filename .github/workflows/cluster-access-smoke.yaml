@@ -38,7 +38,7 @@ jobs:
 
       - name: Cluster access (etcd over tunnel)
         if: steps.secrets.outputs.skip != 'true'
-        uses: HerodotusDev/cicd/.github/actions/cluster-access@new-main
+        uses: HerodotusDev/cicd/.github/actions/cluster-access@main
         with:
           wg_config: ${{ secrets.WG_CONFIG }}
           deployer_kubeconfig: ${{ secrets.DEPLOYER_KUBECONFIG }}

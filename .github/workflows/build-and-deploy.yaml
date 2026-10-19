@@ -34,7 +34,7 @@ jobs:
   guard:
     runs-on: ubuntu-latest
     steps:
-      - uses: HerodotusDev/cicd/.github/actions/guard-branch@new-main
+      - uses: HerodotusDev/cicd/.github/actions/guard-branch@main
 
       - name: Validate build-strategy input
         if: inputs.build-strategy != 'parallel' && inputs.build-strategy != 'sequential'
@@ -54,20 +54,20 @@ jobs:
       unique_versions: ${{ steps.build-matrix.outputs.unique_versions }}
     steps:
       - name: Checkout caller repo
-        uses: HerodotusDev/cicd/.github/actions/checkout-repo@new-main
+        uses: HerodotusDev/cicd/.github/actions/checkout-repo@main
         with:
           token: ${{ secrets.SUBMODULES_PAT || secrets.GITHUB_TOKEN }}
           submodules: ${{ inputs.submodules }}
 
       - name: Load Inputs from YAML
         id: load-inputs
-        uses: HerodotusDev/cicd/.github/actions/load-inputs@new-main
+        uses: HerodotusDev/cicd/.github/actions/load-inputs@main
         with:
           inputs_file: ${{ env.inputs_files }}
 
       - name: Build app matrix metadata
         id: build-matrix
-        uses: HerodotusDev/cicd/.github/actions/build-matrix@new-main
+        uses: HerodotusDev/cicd/.github/actions/build-matrix@main
         with:
           app_matrix: ${{ steps.load-inputs.outputs.app_matrix }}
           app_names: ${{ steps.load-inputs.outputs.app_names }}
@@ -106,7 +106,7 @@ jobs:
 
       - name: Checkout caller repo
         if: steps.gate.outputs.run == 'true'
-        uses: HerodotusDev/cicd/.github/actions/checkout-repo@new-main
+        uses: HerodotusDev/cicd/.github/actions/checkout-repo@main
         with:
           token: ${{ secrets.SUBMODULES_PAT || secrets.GITHUB_TOKEN }}
           submodules: ${{ inputs.submodules }}
@@ -114,13 +114,13 @@ jobs:
       - name: Load Inputs from YAML
         id: load-inputs
         if: steps.gate.outputs.run == 'true'
-        uses: HerodotusDev/cicd/.github/actions/load-inputs@new-main
+        uses: HerodotusDev/cicd/.github/actions/load-inputs@main
         with:
           inputs_file: ${{ env.inputs_files }}
 
       - name: Cluster access (etcd over tunnel)
         if: steps.gate.outputs.run == 'true' && matrix.app.etcd_build_env == true
-        uses: HerodotusDev/cicd/.github/actions/cluster-access@new-main
+        uses: HerodotusDev/cicd/.github/actions/cluster-access@main
         with:
           wg_config: ${{ secrets.WG_CONFIG }}
           deployer_kubeconfig: ${{ secrets.DEPLOYER_KUBECONFIG }}
@@ -130,7 +130,7 @@ jobs:
       - name: Pull build-time .env from ETCD
         id: build-env
         if: steps.gate.outputs.run == 'true' && matrix.app.etcd_build_env == true
-        uses: HerodotusDev/cicd/.github/actions/pull-etcd-build-env@new-main
+        uses: HerodotusDev/cicd/.github/actions/pull-etcd-build-env@main
         with:
           namespace: ${{ env.namespace }}
           app_name: ${{ matrix.app.etcd_name || matrix.app.name }}
@@ -141,7 +141,7 @@ jobs:
 
       - name: Build and push image
         if: steps.gate.outputs.run == 'true'
-        uses: HerodotusDev/cicd/.github/actions/build-and-push-image@new-main
+        uses: HerodotusDev/cicd/.github/actions/build-and-push-image@main
         with:
           registry: ${{ env.registry }}
           registry_host: ${{ env.registry_host }}
@@ -172,14 +172,14 @@ jobs:
         arch: [amd64, arm64]
     steps:
       - name: Checkout caller repo
-        uses: HerodotusDev/cicd/.github/actions/checkout-repo@new-main
+        uses: HerodotusDev/cicd/.github/actions/checkout-repo@main
         with:
           token: ${{ secrets.SUBMODULES_PAT || secrets.GITHUB_TOKEN }}
           submodules: ${{ inputs.submodules }}
 
       - name: Load Inputs from YAML
         id: load-inputs
-        uses: HerodotusDev/cicd/.github/actions/load-inputs@new-main
+        uses: HerodotusDev/cicd/.github/actions/load-inputs@main
         with:
           inputs_file: ${{ env.inputs_files }}
 
@@ -192,7 +192,7 @@ jobs:
 
       - name: Cluster access (etcd over tunnel)
         if: steps.detect-etcd.outputs.needs_etcd == 'true'
-        uses: HerodotusDev/cicd/.github/actions/cluster-access@new-main
+        uses: HerodotusDev/cicd/.github/actions/cluster-access@main
         with:
           wg_config: ${{ secrets.WG_CONFIG }}
           deployer_kubeconfig: ${{ secrets.DEPLOYER_KUBECONFIG }}
@@ -200,7 +200,7 @@ jobs:
           etcd_forward: true
 
       - name: Build and push all images sequentially
-        uses: HerodotusDev/cicd/.github/actions/build-and-push-image-sequential@new-main
+        uses: HerodotusDev/cicd/.github/actions/build-and-push-image-sequential@main
         with:
           registry: ${{ env.registry }}
           registry_host: ${{ env.registry_host }}
@@ -247,7 +247,7 @@ jobs:
 
       - name: Checkout caller repo
         if: steps.gate.outputs.run == 'true'
-        uses: HerodotusDev/cicd/.github/actions/checkout-repo@new-main
+        uses: HerodotusDev/cicd/.github/actions/checkout-repo@main
         with:
           token: ${{ secrets.SUBMODULES_PAT || secrets.GITHUB_TOKEN }}
           submodules: ${{ inputs.submodules }}
@@ -255,13 +255,13 @@ jobs:
       - name: Load Inputs from YAML
         id: load-init-inputs
         if: steps.gate.outputs.run == 'true'
-        uses: HerodotusDev/cicd/.github/actions/load-inputs@new-main
+        uses: HerodotusDev/cicd/.github/actions/load-inputs@main
         with:
           inputs_file: ${{ env.inputs_files }}
 
       - name: Build and push init image
         if: steps.gate.outputs.run == 'true'
-        uses: HerodotusDev/cicd/.github/actions/build-and-push-image@new-main
+        uses: HerodotusDev/cicd/.github/actions/build-and-push-image@main
         with:
           registry: ${{ env.registry }}
           registry_host: ${{ env.registry_host }}
@@ -285,18 +285,18 @@ jobs:
       # env.image_suffix / env.k8s_env are job-scoped (set by load-inputs in
       # the build jobs); the merge job needs its own load to see them.
       - name: Checkout caller repo
-        uses: HerodotusDev/cicd/.github/actions/checkout-repo@new-main
+        uses: HerodotusDev/cicd/.github/actions/checkout-repo@main
         with:
           token: ${{ secrets.SUBMODULES_PAT || secrets.GITHUB_TOKEN }}
 
       - name: Load Inputs from YAML
         id: load-inputs
-        uses: HerodotusDev/cicd/.github/actions/load-inputs@new-main
+        uses: HerodotusDev/cicd/.github/actions/load-inputs@main
         with:
           inputs_file: ${{ env.inputs_files }}
 
       - name: Merge per-arch images into manifest lists
-        uses: HerodotusDev/cicd/.github/actions/merge-manifests@new-main
+        uses: HerodotusDev/cicd/.github/actions/merge-manifests@main
         with:
           registry: ${{ env.registry }}
           registry_host: ${{ env.registry_host }}
@@ -313,19 +313,19 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout caller repo
-        uses: HerodotusDev/cicd/.github/actions/checkout-repo@new-main
+        uses: HerodotusDev/cicd/.github/actions/checkout-repo@main
         with:
           token: ${{ secrets.SUBMODULES_PAT || secrets.GITHUB_TOKEN }}
           submodules: ${{ inputs.submodules }}
 
       - name: Load Inputs from YAML
         id: load-inputs
-        uses: HerodotusDev/cicd/.github/actions/load-inputs@new-main
+        uses: HerodotusDev/cicd/.github/actions/load-inputs@main
         with:
           inputs_file: ${{ env.inputs_files }}
 
       - name: Create Git tag
-        uses: HerodotusDev/cicd/.github/actions/create-git-tag@new-main
+        uses: HerodotusDev/cicd/.github/actions/create-git-tag@main
         with:
           tag: ${{ needs.define-matrix.outputs.primary_version }}
           token: ${{ secrets.GITHUB_TOKEN }}
@@ -347,14 +347,14 @@ jobs:
 
       - name: Cluster access
         if: ${{ matrix.app.name != '__no_init__' }}
-        uses: HerodotusDev/cicd/.github/actions/cluster-access@new-main
+        uses: HerodotusDev/cicd/.github/actions/cluster-access@main
         with:
           wg_config: ${{ secrets.WG_CONFIG }}
           deployer_kubeconfig: ${{ secrets.DEPLOYER_KUBECONFIG }}
 
       - name: Checkout caller repo
         if: ${{ matrix.app.name != '__no_init__' }}
-        uses: HerodotusDev/cicd/.github/actions/checkout-repo@new-main
+        uses: HerodotusDev/cicd/.github/actions/checkout-repo@main
         with:
           token: ${{ secrets.SUBMODULES_PAT || secrets.GITHUB_TOKEN }}
           submodules: ${{ inputs.submodules }}
@@ -362,13 +362,13 @@ jobs:
       - name: Load Inputs from YAML
         id: load-inputs
         if: ${{ matrix.app.name != '__no_init__' }}
-        uses: HerodotusDev/cicd/.github/actions/load-inputs@new-main
+        uses: HerodotusDev/cicd/.github/actions/load-inputs@main
         with:
           inputs_file: ${{ env.inputs_files }}
 
       - name: Deploy init pod
         if: ${{ matrix.app.name != '__no_init__' }}
-        uses: HerodotusDev/cicd/.github/actions/deploy-init-to-k8s@new-main
+        uses: HerodotusDev/cicd/.github/actions/deploy-init-to-k8s@main
         with:
           namespace: ${{ env.namespace }}
           pod_manifest: ./k8s/${{ env.k8s_env }}/${{ matrix.app.name }}-pod.yaml
@@ -393,19 +393,19 @@ jobs:
       config_changed: ${{ steps.pull_config.outputs.config_changed == 'true' || steps.ensure_configmap.outputs.config_changed == 'true' }}
     steps:
       - name: Checkout caller repo
-        uses: HerodotusDev/cicd/.github/actions/checkout-repo@new-main
+        uses: HerodotusDev/cicd/.github/actions/checkout-repo@main
         with:
           token: ${{ secrets.SUBMODULES_PAT || secrets.GITHUB_TOKEN }}
           submodules: ${{ inputs.submodules }}
 
       - name: Load Inputs from YAML
         id: load-inputs
-        uses: HerodotusDev/cicd/.github/actions/load-inputs@new-main
+        uses: HerodotusDev/cicd/.github/actions/load-inputs@main
         with:
           inputs_file: ${{ env.inputs_files }}
 
       - name: Cluster access (etcd over tunnel)
-        uses: HerodotusDev/cicd/.github/actions/cluster-access@new-main
+        uses: HerodotusDev/cicd/.github/actions/cluster-access@main
         with:
           wg_config: ${{ secrets.WG_CONFIG }}
           deployer_kubeconfig: ${{ secrets.DEPLOYER_KUBECONFIG }}
@@ -414,7 +414,7 @@ jobs:
 
       - name: Ensure ConfigMap from files
         id: ensure_configmap
-        uses: HerodotusDev/cicd/.github/actions/create-configmap@new-main
+        uses: HerodotusDev/cicd/.github/actions/create-configmap@main
         with:
           namespace: ${{ env.namespace }}
           app_name: ${{ matrix.app.name }}
@@ -422,7 +422,7 @@ jobs:
 
       - name: Pull config from etcd
         id: pull_config
-        uses: HerodotusDev/cicd/.github/actions/pull-etcd-config@new-main
+        uses: HerodotusDev/cicd/.github/actions/pull-etcd-config@main
         with:
           namespace: ${{ env.namespace }}
           app_name: ${{ matrix.app.etcd_name }}
@@ -432,7 +432,7 @@ jobs:
           k8s_env: ${{ env.k8s_env }}
 
       - name: Deploy to Kubernetes
-        uses: HerodotusDev/cicd/.github/actions/deploy-to-k8s@new-main
+        uses: HerodotusDev/cicd/.github/actions/deploy-to-k8s@main
         with:
           namespace: ${{ env.namespace }}
           deployment_file: ./k8s/${{ env.k8s_env }}/${{ matrix.app.manifest_name }}-deployment.yaml

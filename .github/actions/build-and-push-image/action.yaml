@@ -121,7 +121,7 @@ runs:
 
     - name: Resolve consumer overrides
       id: overrides
-      uses: HerodotusDev/cicd/.github/actions/resolve-overrides@new-main
+      uses: HerodotusDev/cicd/.github/actions/resolve-overrides@main
       with:
         repository: ${{ github.repository }}
         app_name: ${{ inputs.app_name }}

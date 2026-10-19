@@ -36,7 +36,7 @@ jobs:
       - uses: actions/checkout@v4
 
       - name: Build and push per-arch image
-        uses: HerodotusDev/cicd/.github/actions/build-and-push-image@new-main
+        uses: HerodotusDev/cicd/.github/actions/build-and-push-image@main
         with:
           registry: ghcr.io/herodotusdev
           registry_host: ghcr.io
@@ -64,7 +64,7 @@ jobs:
       - uses: actions/checkout@v4
 
       - name: Merge per-arch images into manifest list
-        uses: HerodotusDev/cicd/.github/actions/merge-manifests@new-main
+        uses: HerodotusDev/cicd/.github/actions/merge-manifests@main
         with:
           registry: ghcr.io/herodotusdev
           registry_host: ghcr.io
