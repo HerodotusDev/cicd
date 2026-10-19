@@ -1,0 +1,12 @@
+# Minimal reusable workflow: probe for cross-repo / cross-branch
+# workflow_call resolution (used by the sunset-gateway pipeline test).
+name: Call test
+
+on:
+  workflow_call:
+
+jobs:
+  echo:
+    runs-on: ubuntu-latest
+    steps:
+      - run: echo "reusable call OK"
