@@ -75,8 +75,6 @@ jobs:
           default_version_key: ${{ env.version_key }}
 
   build-and-push-image:
-    # Per-app platforms opt-out (cicd-inputs): skip arch jobs the app excludes.
-    if: inputs.build-strategy != 'sequential' && contains(matrix.app.platforms || 'linux/amd64,linux/arm64', format('linux/{0}', matrix.arch))
     needs: [define-matrix]
     runs-on: ${{ matrix.arch == 'arm64' && 'ubuntu-24.04-arm' || 'ubuntu-latest' }}
     # One WG peer per repo: builds that pull etcd config use the tunnel and
@@ -90,7 +88,24 @@ jobs:
         arch: [amd64, arm64]
         app: ${{ fromJson(needs.define-matrix.outputs.matrix_deploy) }}
     steps:
+      # Per-app platforms opt-out (cicd-inputs): skip arch jobs the app
+      # excludes. Job-level `if` cannot see `matrix`, so gate via step output.
+      - id: gate
+        run: |
+          if [[ "${{ inputs.build-strategy }}" == "sequential" ]]; then
+            echo "run=false" >> "$GITHUB_OUTPUT"; exit 0
+          fi
+          platforms="${{ matrix.app.platforms || 'linux/amd64,linux/arm64' }}"
+          if [[ "${platforms}" == *"linux/${{ matrix.arch }}"* ]]; then
+            echo "run=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "run=false" >> "$GITHUB_OUTPUT"
+            echo "${{ matrix.app.name }}: platforms '${platforms}' exclude linux/${{ matrix.arch }} — skipping."
+          fi
+        shell: bash
+
       - name: Checkout caller repo
+        if: steps.gate.outputs.run == 'true'
         uses: HerodotusDev/cicd/.github/actions/checkout-repo@new-main
         with:
           token: ${{ secrets.SUBMODULES_PAT || secrets.GITHUB_TOKEN }}
@@ -98,12 +113,13 @@ jobs:
 
       - name: Load Inputs from YAML
         id: load-inputs
+        if: steps.gate.outputs.run == 'true'
         uses: HerodotusDev/cicd/.github/actions/load-inputs@new-main
         with:
           inputs_file: ${{ env.inputs_files }}
 
       - name: Cluster access (etcd over tunnel)
-        if: matrix.app.etcd_build_env == true
+        if: steps.gate.outputs.run == 'true' && matrix.app.etcd_build_env == true
         uses: HerodotusDev/cicd/.github/actions/cluster-access@new-main
         with:
           wg_config: ${{ secrets.WG_CONFIG }}
@@ -113,7 +129,7 @@ jobs:
 
       - name: Pull build-time .env from ETCD
         id: build-env
-        if: matrix.app.etcd_build_env == true
+        if: steps.gate.outputs.run == 'true' && matrix.app.etcd_build_env == true
         uses: HerodotusDev/cicd/.github/actions/pull-etcd-build-env@new-main
         with:
           namespace: ${{ env.namespace }}
@@ -124,6 +140,7 @@ jobs:
           k8s_env: ${{ env.k8s_env }}
 
       - name: Build and push image
+        if: steps.gate.outputs.run == 'true'
         uses: HerodotusDev/cicd/.github/actions/build-and-push-image@new-main
         with:
           registry: ${{ env.registry }}
@@ -208,18 +225,28 @@ jobs:
       matrix:
         arch: [amd64, arm64]
         app: ${{ fromJson(needs.define-matrix.outputs.matrix_init) }}
-    if: contains(matrix.app.platforms || 'linux/amd64,linux/arm64', format('linux/{0}', matrix.arch))
     steps:
-      - name: Skip init pod build
-        if: ${{ matrix.app.name == '__no_init__' }}
-        run: echo "No init pods requested. Skipping build-and-push-init job."
-
-      - name: Skip init pod build (reusing image)
-        if: ${{ matrix.app.name != '__no_init__' && matrix.app.image != matrix.app.name }}
-        run: echo "Init pod ${{ matrix.app.name }} reuses image from ${{ matrix.app.image }}. Skipping build."
+      # Job-level `if` cannot see `matrix`; gate everything on one step output.
+      - id: gate
+        run: |
+          name="${{ matrix.app.name }}"
+          image="${{ matrix.app.image || matrix.app.name }}"
+          platforms="${{ matrix.app.platforms || 'linux/amd64,linux/arm64' }}"
+          if [[ "${name}" == "__no_init__" ]]; then
+            echo "No init apps requested. Skipping build-and-push-init job."
+          elif [[ "${image}" != "${name}" ]]; then
+            echo "Init pod ${name} reuses image from ${image}. Skipping build."
+          elif [[ "${platforms}" != *"linux/${{ matrix.arch }}"* ]]; then
+            echo "${name}: platforms '${platforms}' exclude linux/${{ matrix.arch }} — skipping."
+          else
+            echo "run=true" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          echo "run=false" >> "$GITHUB_OUTPUT"
+        shell: bash
 
       - name: Checkout caller repo
-        if: ${{ matrix.app.name != '__no_init__' && matrix.app.image == matrix.app.name }}
+        if: steps.gate.outputs.run == 'true'
         uses: HerodotusDev/cicd/.github/actions/checkout-repo@new-main
         with:
           token: ${{ secrets.SUBMODULES_PAT || secrets.GITHUB_TOKEN }}
@@ -227,13 +254,13 @@ jobs:
 
       - name: Load Inputs from YAML
         id: load-init-inputs
-        if: ${{ matrix.app.name != '__no_init__' && matrix.app.image == matrix.app.name }}
+        if: steps.gate.outputs.run == 'true'
         uses: HerodotusDev/cicd/.github/actions/load-inputs@new-main
         with:
           inputs_file: ${{ env.inputs_files }}
 
       - name: Build and push init image
-        if: ${{ matrix.app.name != '__no_init__' && matrix.app.image == matrix.app.name }}
+        if: steps.gate.outputs.run == 'true'
         uses: HerodotusDev/cicd/.github/actions/build-and-push-image@new-main
         with:
           registry: ${{ env.registry }}
