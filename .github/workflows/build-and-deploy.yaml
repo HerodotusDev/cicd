@@ -52,7 +52,6 @@ jobs:
       app_versions: ${{ steps.build-matrix.outputs.app_versions }}
       primary_version: ${{ steps.build-matrix.outputs.primary_version }}
       unique_versions: ${{ steps.build-matrix.outputs.unique_versions }}
-      has_etcd: ${{ steps.detect-etcd.outputs.has_etcd }}
     steps:
       - name: Checkout caller repo
         uses: HerodotusDev/cicd/.github/actions/checkout-repo@new-main
@@ -75,22 +74,17 @@ jobs:
           default_version_file: ${{ env.version_file }}
           default_version_key: ${{ env.version_key }}
 
-      - name: Detect etcd build-env apps
-        id: detect-etcd
-        run: |
-          has_etcd=$(printf '%s' '${{ needs.define-matrix.outputs.matrix_deploy }}' | jq '[.[] | select((.etcd_build_env // false) == true)] | length > 0')
-          echo "has_etcd=${has_etcd}" >> "$GITHUB_OUTPUT"
-        shell: bash
-
   build-and-push-image:
     if: inputs.build-strategy != 'sequential'
     needs: [define-matrix]
     runs-on: ${{ matrix.arch == 'arm64' && 'ubuntu-24.04-arm' || 'ubuntu-latest' }}
-    # One WG peer per repo: when any app pulls build env from etcd, the tunnel
-    # must not have concurrent sessions, so builds serialize; otherwise they
-    # fan out.
+    # One WG peer per repo: builds that pull etcd config use the tunnel and
+    # tunnels must not overlap (WireGuard moves the session on every
+    # handshake). max-parallel takes a literal number — no expressions — so
+    # builds serialize unconditionally; parallel strategy is for small app
+    # counts, the monorepo-sized case is what sequential mode is for.
     strategy:
-      max-parallel: ${{ needs.define-matrix.outputs.has_etcd == 'true' && 1 || 8 }}
+      max-parallel: 1
       matrix:
         arch: [amd64, arm64]
         app: ${{ fromJson(needs.define-matrix.outputs.matrix_deploy) }}
