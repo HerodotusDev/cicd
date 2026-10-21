@@ -50,8 +50,13 @@ done
 
 overrides_file="${GITHUB_ACTION_PATH}/../resolve-overrides/overrides.yaml"
 env_dir="${RUNNER_TEMP:-/tmp}/build-env"
-bake_file="${RUNNER_TEMP:-/tmp}/bake-${arch}.json"
-mkdir -p "${env_dir}"
+# The bake definition and per-target contexts are resolved by buildkitd
+# daemon-side: they must live inside the workspace (part of the transferred
+# local context), not in RUNNER_TEMP — paths outside it are invisible to the
+# buildkitd container (lstat failure).
+bake_file="${GITHUB_WORKSPACE}/bake-${arch}.json"
+ctx_root="${GITHUB_WORKSPACE}/.buildctx"
+mkdir -p "${env_dir}" "${ctx_root}"
 
 # Build-time env: decode the prep-provided payload into per-app .env files.
 # The etcd pull already happened in prep, over its own tunnel — build jobs
@@ -125,9 +130,11 @@ while IFS= read -r app; do
 
   ctx="${context}"
   if [[ "${etcd_build_env}" == "true" ]]; then
-    ctx="${RUNNER_TEMP:-/tmp}/build-ctx-${name}"
-    rm -rf "${ctx}"
-    cp -a "${context}" "${ctx}"
+    # workspace-relative: the daemon resolves target paths inside the
+    # transferred local context
+    rm -rf "${ctx_root}/${name}"
+    cp -a "${context}" "${ctx_root}/${name}"
+    ctx=".buildctx/${name}"
     if [[ -s "${env_dir}/${name}.env" ]]; then
       cp "${env_dir}/${name}.env" "${ctx}/.env.production"
       echo "${name}: injected .env.production ($(wc -l < "${env_dir}/${name}.env") lines)"
