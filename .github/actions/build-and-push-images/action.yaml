@@ -1,12 +1,15 @@
 ---
-name: "Build and Push Images (parallel, one buildx daemon)"
+name: "Build and Push Images (bake, one buildx invocation)"
 description: >
-  Builds every app of one platform in parallel inside a single job/daemon.
-  All apps share identical compile-stage cache keys (one shared Dockerfile,
-  APP_NAME only affects the runtime stage), so BuildKit computes shared
-  vertices once — the workspace compile runs once and the thin per-app
-  runtime stages fan out concurrently. Bounded by the repo-level
-  `build_concurrency` cicd-inputs key (default 6).
+  Builds every app of one platform via docker/bake-action in a single buildx
+  invocation: BuildKit dedups the shared compile vertices across targets (all
+  apps share the same Dockerfile DAG; APP_NAME only affects the runtime
+  stage), so the workspace compile runs once and the thin per-app runtime
+  stages fan out concurrently.
+  A prior script step resolves apps, applies tag-exists skips, decodes the
+  prep-provided build-env payload (apps with etcd_build_env build from an
+  isolated context copy) and writes the bake file; targets default to the
+  gha cache backend with the repo-level `cache_scope` key.
 
 inputs:
   registry:
@@ -67,7 +70,8 @@ runs:
       with:
         install: true
 
-    - name: Build and push images in parallel
+    - name: Prepare bake file
+      id: prepare
       shell: bash
       env:
         REGISTRY: ${{ inputs.registry }}
@@ -80,4 +84,11 @@ runs:
         K8S_ENV: ${{ inputs.k8s_env }}
         PLATFORMS: ${{ inputs.platforms }}
       run: |
-        bash "${GITHUB_ACTION_PATH}/build_images.sh"
+        bash "${GITHUB_ACTION_PATH}/prepare_bake.sh"
+
+    - name: Bake all images (single buildx invocation, shared compile dedup)
+      if: steps.prepare.outputs.targets != '0'
+      uses: docker/bake-action@v6
+      with:
+        files: ${{ steps.prepare.outputs.bake_file }}
+        push: true

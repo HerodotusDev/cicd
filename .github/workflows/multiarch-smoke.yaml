@@ -57,43 +57,6 @@ jobs:
           [ "${out}" = "arch=${expected}" ] || { echo "::error::unexpected output: ${out} (expected arch=${expected})"; exit 1; }
         shell: bash
 
-  raw-cli-cache-probe:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-
-      - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v3
-        with:
-          install: true
-
-      - name: Log in to ghcr
-        uses: docker/login-action@v3
-        with:
-          registry: ghcr.io
-          username: ${{ github.actor }}
-          password: ${{ github.token }}
-
-      - name: Raw buildx build with type=gha cache (full output)
-        run: |
-          set -euo pipefail
-          docker buildx build \
-            --progress=plain \
-            --push \
-            --file docker/Dockerfile.smoke-multiarch \
-            --cache-from "type=gha,scope=raw-probe-amd64" \
-            --cache-to "type=gha,mode=max,scope=raw-probe-amd64" \
-            --network host \
-            --tag "ghcr.io/herodotusdev/cicd-smoke-multiarch:raw-${{ github.run_id }}-amd64" \
-            .github/smoke 2>&1 | tee "${RUNNER_TEMP}/raw-build.log"
-          echo "=== cache lines ==="
-          grep -iE "importing cache manifest|sending cache export|exporting cache|cache export" "${RUNNER_TEMP}/raw-build.log" || echo "NO CACHE LINES FOUND"
-          echo "=== env present ==="
-          for v in GITHUB_ACTIONS ACTIONS_CACHE_URL ACTIONS_RESULTS_URL ACTIONS_RUNTIME_TOKEN; do
-            if [[ -n "${!v:-}" ]]; then echo "$v set"; else echo "$v MISSING"; fi
-          done
-        shell: bash
-
   merge:
     needs: [build]
     runs-on: ubuntu-latest
