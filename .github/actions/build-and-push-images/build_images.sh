@@ -161,13 +161,12 @@ build_one() {
 
   t1=$(date +%s)
   echo "✅ ${name}: pushed ${arch_tag} ($((t1 - t0))s)"
-  # Cache trace: buildx output goes to the per-app log; surface the restore and
-  # export phases here so cache behaviour is visible in the job log.
-  if grep -qiE "importing cache manifest|sending cache export|exporting cache|cache export" "${log}"; then
-    grep -iE "importing cache manifest|sending cache export|exporting cache|cache export" "${log}" | head -6
-  else
-    echo "${name}: no cache activity in build log"
-  fi
+  # Cache trace: buildx output goes to the per-app log; surface the header
+  # (builder + cache registration) and the restore/export phases so cache
+  # behaviour is visible in the job log.
+  echo "── cache trace ${name} ──"
+  head -20 "${log}"
+  grep -iE "importing cache manifest|sending cache export|exporting cache|cache export|cache" "${log}" | head -8
 }
 
 export REGISTRY IMAGE_SUFFIX APP_VERSIONS PRIMARY_VERSION PLATFORMS K8S_ENV \
