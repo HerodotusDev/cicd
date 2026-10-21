@@ -155,7 +155,7 @@ while IFS= read -r app; do
     '$targets + {
       ($name): {
         "context": $ctx,
-        "dockerfile": ($ctx + "/docker/Dockerfile." + $dockerfile),
+        "dockerfile": ("docker/Dockerfile." + $dockerfile),
         "args": {"APP_NAME": $app_arg},
         "platforms": ["linux/" + $platform],
         "tags": [$tag],
