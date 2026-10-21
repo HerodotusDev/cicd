@@ -166,7 +166,8 @@ build_one() {
   # behaviour is visible in the job log.
   echo "── cache trace ${name} ──"
   head -20 "${log}"
-  grep -iE "importing cache manifest|sending cache export|exporting cache|cache export|cache" "${log}" | head -8
+  # Informational only: grep exits 1 when the log has no cache line, which under pipefail would fail a build that already pushed.
+  grep -iE "importing cache manifest|sending cache export|exporting cache|cache export|cache" "${log}" | head -8 || true
 }
 
 export REGISTRY IMAGE_SUFFIX APP_VERSIONS PRIMARY_VERSION PLATFORMS K8S_ENV \
