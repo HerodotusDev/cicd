@@ -90,5 +90,9 @@ runs:
       if: steps.prepare.outputs.targets != '0'
       uses: docker/bake-action@v6
       with:
+        # Path context (source: .) — v6 defaults to the Git context, which
+        # ignores local file mutations like the generated bake file and the
+        # per-app etcd context copies.
+        source: .
         files: ${{ steps.prepare.outputs.bake_file }}
         push: true
