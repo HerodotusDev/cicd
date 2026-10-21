@@ -1,0 +1,121 @@
+---
+name: "Pull build-time env payload from etcd"
+description: >
+  Detects apps with `etcd_build_env: true`, opens the repo's WireGuard tunnel
+  in THIS job only, pulls each app's build-time .env from etcd, and emits a
+  base64 JSON payload (app name → .env content) for the build jobs. Build jobs
+  never open the tunnel themselves — the per-repo WG peer serves one tunnel at
+  a time, and the two arch build jobs run in parallel. Output is '{}' when no
+  app needs build-time env. Fails when the combined payload would exceed the
+  step-output budget.
+
+inputs:
+  wg_config:
+    description: "wg-quick config for the repo's deployer WG peer."
+    required: true
+  deployer_kubeconfig:
+    description: "Kubeconfig for the deployer identity, pointing at the capsule proxy via the tunnel."
+    required: true
+  namespace:
+    description: "Namespace holding daloc-etcd."
+    required: true
+  k8s_env:
+    description: "Kubernetes environment (stg / prod) — etcd key segment."
+    required: true
+  etcd_root:
+    description: "ETCD root path."
+    required: true
+  matrix_deploy:
+    description: "JSON array of deploy apps (prep matrix_deploy output)."
+    required: true
+
+outputs:
+  build_env_payload:
+    description: "JSON map of app name → base64 build-time .env; '{}' when nothing needed."
+    value: ${{ steps.payload.outputs.build_env_payload }}
+
+runs:
+  using: "composite"
+  steps:
+    - name: Detect etcd build-env apps
+      id: detect
+      shell: bash
+      env:
+        MATRIX_DEPLOY: ${{ inputs.matrix_deploy }}
+      run: |
+        needs_etcd=$(jq '[.[] | select((.etcd_build_env // false) == true)] | length > 0' <<<"${MATRIX_DEPLOY}")
+        echo "needs_etcd=${needs_etcd}" >> "$GITHUB_OUTPUT"
+
+    - name: Cluster access (etcd over tunnel)
+      if: steps.detect.outputs.needs_etcd == 'true'
+      uses: HerodotusDev/cicd/.github/actions/cluster-access@main
+      with:
+        wg_config: ${{ inputs.wg_config }}
+        deployer_kubeconfig: ${{ inputs.deployer_kubeconfig }}
+        namespace: ${{ inputs.namespace }}
+        etcd_forward: true
+
+    - name: Pull build-time .env and build payload
+      id: payload
+      if: steps.detect.outputs.needs_etcd == 'true'
+      shell: bash
+      env:
+        MATRIX_DEPLOY: ${{ inputs.matrix_deploy }}
+        NAMESPACE: ${{ inputs.namespace }}
+        K8S_ENV: ${{ inputs.k8s_env }}
+        ETCD_ROOT: ${{ inputs.etcd_root }}
+        ETCD_USER: ${{ env.ETCD_USER }}
+        ETCD_PASSWORD: ${{ env.ETCD_PASSWORD }}
+      run: |
+        set -euo pipefail
+        payload='{}'
+        pull="${GITHUB_ACTION_PATH}/../etcd-pull/pull.sh"
+        while IFS= read -r app; do
+          [[ -z "${app}" ]] && continue
+          name=$(jq -r '.name' <<<"${app}")
+          etcd_name=$(jq -r '.etcd_name // .name' <<<"${app}")
+          out="${RUNNER_TEMP}/${name}.env"
+          secret="${RUNNER_TEMP}/${name}.secret.yaml"
+          rm -f "${out}" "${secret}"
+
+          echo "Fetching etcd build-env: /${ETCD_ROOT}/${K8S_ENV}/${etcd_name}/.env"
+          ETCD_HOST="http://127.0.0.1:2379" \
+          ETCD_USER="${ETCD_USER}" \
+          ETCD_PASSWORD="${ETCD_PASSWORD}" \
+          ETCD_KEY="/${ETCD_ROOT}/${K8S_ENV}/${etcd_name}/.env" \
+          APP_NAME="${etcd_name}" \
+          NAMESPACE="${NAMESPACE}" \
+          OUTPUT_FILE="${secret}" \
+          bash "${pull}" || true
+
+          if [[ -s "${secret}" ]]; then
+            in_data=false
+            : > "${out}"
+            while IFS= read -r line; do
+              if [[ "${line}" == "data:" ]]; then in_data=true; continue; fi
+              if ${in_data}; then
+                if [[ "${line}" =~ ^[[:space:]]+([^:]+):[[:space:]]+(.+)$ ]]; then
+                  echo "${BASH_REMATCH[1]}=$(echo "${BASH_REMATCH[2]}" | base64 -d 2>/dev/null || echo "${BASH_REMATCH[2]}")" >> "${out}"
+                elif [[ ! "${line}" =~ ^[[:space:]] ]]; then
+                  break
+                fi
+              fi
+            done < "${secret}"
+            rm -f "${secret}"
+          fi
+
+          if [[ -s "${out}" ]]; then
+            echo "${name}: pulled $(wc -l < "${out}") lines of build-time env"
+          else
+            echo "::warning::No .env at /${ETCD_ROOT}/${K8S_ENV}/${etcd_name}/.env — ${name} builds without it"
+          fi
+          payload=$(jq -cn --argjson p "${payload}" --arg n "${name}" --arg v "$(base64 -w0 "${out}" 2>/dev/null || echo '')" '$p + {($n): $v}')
+          rm -f "${out}"
+        done < <(jq -c '.[] | select((.etcd_build_env // false) == true)' <<<"${MATRIX_DEPLOY}")
+
+        size=$(jq -r '[.[] | length] | add // 0' <<<"${payload}")
+        if (( size > 400000 )); then
+          echo "::error::Build-env payload too large for step outputs (${size} base64 chars) — reduce etcd build-env keys."
+          exit 1
+        fi
+        echo "build_env_payload=$(jq -c . <<<"${payload}")" >> "$GITHUB_OUTPUT"
