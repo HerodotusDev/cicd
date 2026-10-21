@@ -164,7 +164,11 @@ while IFS= read -r app; do
   echo "→ ${name}: ${arch_tag} (APP_NAME=${app_arg}, scope=${scope})"
 done < <(jq -c '.[]' <<<"${apps_json}")
 
-jq -n --argjson target "${targets_json}" '{target: $target}' > "${bake_file}"
+# Bake needs a default group listing every target (bake-action invokes the
+# default target when `targets` input is empty).
+jq -n --argjson target "${targets_json}" \
+  --argjson names "$(jq -c '[keys[]]' <<<"${targets_json}")" \
+  '{target: $target, group: {"default": {targets: $names}}}' > "${bake_file}"
 echo "Bake file ready: ${targets} target(s), platform ${PLATFORMS} → ${bake_file}"
 {
   echo "targets=${targets}"
