@@ -1,0 +1,95 @@
+---
+name: "Build and Push Images (parallel, one buildx daemon)"
+description: >
+  Builds every app of one platform in parallel inside a single job/daemon.
+  All apps share identical compile-stage cache keys (one shared Dockerfile,
+  APP_NAME only affects the runtime stage), so BuildKit computes shared
+  vertices once — the workspace compile runs once and the thin per-app
+  runtime stages fan out concurrently. Bounded by the repo-level
+  `build_concurrency` cicd-inputs key (default 6).
+
+inputs:
+  registry:
+    description: "Image repository prefix incl. registry host (e.g. ghcr.io/herodotusdev)."
+    required: true
+  registry_host:
+    description: "Registry host for docker login (e.g. ghcr.io)."
+    required: true
+  image_suffix:
+    description: "Image name suffix for the target environment ('-prod' or '-stg')."
+    required: false
+    default: ""
+  matrix_deploy:
+    description: "JSON array of deploy apps (prep matrix_deploy output)."
+    required: true
+  matrix_init:
+    description: "JSON array of init apps (prep matrix_init output). Init apps reusing another image (image != name) are skipped — already covered."
+    required: false
+    default: "[]"
+  app_versions:
+    description: "JSON map of app name to resolved version (prep app_versions output)."
+    required: true
+  primary_version:
+    description: "Version used for init apps (prep primary_version output)."
+    required: false
+    default: ""
+  registry_username:
+    description: "Registry login (github.actor for ghcr)."
+    required: true
+  registry_password:
+    description: "Registry password (github.token for ghcr; needs packages:write)."
+    required: true
+  namespace:
+    description: "Kubernetes namespace (post -stg/-prod rewrite; used to resolve etcd host)."
+    required: true
+  etcd_root:
+    description: "ETCD root path for build-env keys."
+    required: true
+  etcd_user:
+    description: "ETCD username (exported by the cluster-access etcd forward)."
+    required: false
+    default: ""
+  etcd_password:
+    description: "ETCD password (exported by the cluster-access etcd forward)."
+    required: false
+    default: ""
+  k8s_env:
+    description: "Kubernetes environment (stg / prod)."
+    required: true
+  platforms:
+    description: "Single buildx platform this job builds (linux/amd64 or linux/arm64). The workflow runs one job per arch on a matching runner; a merge step assembles the manifest list. Per-app platforms in cicd-inputs can exclude an arch."
+    required: false
+    default: "linux/amd64"
+
+runs:
+  using: "composite"
+  steps:
+    - name: Log in to Docker Registry
+      uses: docker/login-action@v3
+      with:
+        registry: ${{ inputs.registry_host }}
+        username: ${{ inputs.registry_username }}
+        password: ${{ inputs.registry_password }}
+
+    - name: Set up Docker Buildx
+      uses: docker/setup-buildx-action@v3
+      with:
+        install: true
+
+    - name: Build and push images in parallel
+      shell: bash
+      env:
+        REGISTRY: ${{ inputs.registry }}
+        IMAGE_SUFFIX: ${{ inputs.image_suffix }}
+        MATRIX_DEPLOY: ${{ inputs.matrix_deploy }}
+        MATRIX_INIT: ${{ inputs.matrix_init }}
+        APP_VERSIONS: ${{ inputs.app_versions }}
+        PRIMARY_VERSION: ${{ inputs.primary_version }}
+        NAMESPACE: ${{ inputs.namespace }}
+        ETCD_ROOT: ${{ inputs.etcd_root }}
+        ETCD_USER: ${{ inputs.etcd_user }}
+        ETCD_PASSWORD: ${{ inputs.etcd_password }}
+        K8S_ENV: ${{ inputs.k8s_env }}
+        PLATFORMS: ${{ inputs.platforms }}
+      run: |
+        bash "${GITHUB_ACTION_PATH}/build_images.sh"

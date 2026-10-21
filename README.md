@@ -26,7 +26,7 @@ Both are org secrets shared by consumer repos. **WireGuard peers are one session
 
 - **Org secret `WG_CONFIG`** holds the default peer (used by the cicd smoke workflow).
 - **Repos that deploy get their own peer + a repo-level `WG_CONFIG` secret** (repo secrets shadow org secrets): `daloc-deployer-monorepo`, `daloc-deployer-frontend-new`, `daloc-deployer-k8s`, … Create the OPNsense peer, put its config in the repo secret. With per-repo peers, two repos deploying at the same time is harmless — different keys, independent tunnels.
-- Inside one repo, the tunnel-using matrix jobs are serialized (`max-parallel: 1` on `deploy` + `deploy-init-pods`) so a single repo can't clash with itself.
+- Inside one repo, there is exactly **one tunnel per job**: the `build` job opens it only when an app pulls build-time env from etcd, and the `finalize` job opens it once for the whole deploy — all apps deploy in parallel through that single tunnel, so a repo can't clash with itself.
 
 The pipeline logs in to ghcr with the caller's `GITHUB_TOKEN` — consumer workflows need `packages: write`. etcd credentials are read at deploy time from the in-namespace `daloc-etcd` secret; no etcd secret lives in GitHub.
 
@@ -57,10 +57,18 @@ tools/install-skill.sh --help   # full usage
 
 Once installed, ask the agent to onboard the repo and it follows the skill.
 
-## Multi-arch builds
-Images build per arch in parallel matrix jobs — `linux/amd64` on `ubuntu-latest`, `linux/arm64` on the native `ubuntu-24.04-arm` runner (billed at $0.005/min, cheaper than the x64 runners) — and push per-arch tags `<image>:<version>-<arch>`. A `merge-manifests` job then assembles `<image>:<version>` + `:latest` as a manifest list, which is what the deploy jobs apply; the kubelet resolves the platform per node, so Kubernetes never needs arch hints.
+## Pipeline shape
 
-Caching is per app AND per arch (`type=gha,scope=<app>-<arch>`): amd64 and arm64 layers are stored/restored independently, so a code-only change re-runs only the compile layer of the changed arch. Dependency layers (`cargo-chef cook`, `bun install`) are cached per arch; a cold build of the daloc Rust workspace compiles in ~15 min per arch, warm builds faster. Per-app `platforms` in `cicd-inputs` excludes an arch from both build and merge.
+Three jobs, four runner spawns total:
+
+1. `prep` — branch guard, inputs, version resolution, app matrix.
+2. `build` — one job per arch (`ubuntu-latest` / native `ubuntu-24.04-arm`); all apps build **in parallel inside the job** against one buildx daemon. Apps share the same Dockerfile DAG (per-app `APP_NAME` only affects the runtime stage), so BuildKit computes shared compile vertices once and fans the thin runtime stages out concurrently.
+3. `finalize` — merges per-arch tags into manifest lists, creates the version tag, opens the cluster tunnel once, then deploys init pods + all apps **in parallel** (bounded by `deploy_concurrency`, default 5) sharing that single tunnel + etcd port-forward.
+
+## Multi-arch builds
+Images build per arch in parallel jobs — `linux/amd64` on `ubuntu-latest`, `linux/arm64` on the native `ubuntu-24.04-arm` runner — and push per-arch tags `<image>:<version>-<arch>`. `finalize` then assembles `<image>:<version>` + `:latest` as a manifest list, which is what the deploys apply; the kubelet resolves the platform per node, so Kubernetes never needs arch hints.
+
+Caching: per-arch buildx GHA cache with scope resolution `app.cache_scope` → repo-level `cache_scope` (cicd-inputs top-level) → app name, always suffixed `-{arch}`. Repos with many apps sharing one Dockerfile should set the repo-level `cache_scope` — all apps then share one cache bucket per arch instead of duplicating the shared compile layers into a bucket per app (the GHA cache is 10 GB per repo, LRU-evicted after 7 days of no access). Dependency layers (`cargo-chef cook`, `bun install`) are cached per arch; a cold build of the daloc Rust workspace compiles in ~15 min per arch, warm builds faster. Per-app `platforms` in `cicd-inputs` excludes an arch from both build and merge.
 
 Dockerfile requirements: base images (`FROM ...`) must be multi-arch manifests (all official rust/debian/node/bun images are) and must not hardcode `x86_64` paths or tools. `.github/workflows/multiarch-smoke.yaml` exercises the per-arch build + merge path on every push touching the build actions.
 

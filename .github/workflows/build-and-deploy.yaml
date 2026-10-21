@@ -8,11 +8,6 @@ on:
         type: string
         required: false
         default: "true"
-      build-strategy:
-        description: "Build execution mode: 'parallel' (default; one matrix job per app) or 'sequential' (one job builds all apps in order inside a single buildx context, so the first build pays for shared compile layers and the rest hit the in-job layer cache)."
-        type: string
-        required: false
-        default: "parallel"
     secrets:
       SUBMODULES_PAT:
         description: "PAT for cloning private submodules. If omitted, submodules are still fetched with GITHUB_TOKEN (works for public submodules)."
@@ -31,19 +26,8 @@ permissions:
   packages: write
 
 jobs:
-  guard:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: HerodotusDev/cicd/.github/actions/guard-branch@main
-
-      - name: Validate build-strategy input
-        if: inputs.build-strategy != 'parallel' && inputs.build-strategy != 'sequential'
-        run: |
-          echo "::error::Invalid build-strategy '${{ inputs.build-strategy }}'. Supported values: 'parallel' (default), 'sequential'."
-          exit 1
-
-  define-matrix:
-    needs: [guard]
+  prep:
+    name: prep (guard + matrix)
     runs-on: ubuntu-latest
     outputs:
       matrix_apps: ${{ steps.build-matrix.outputs.matrix_apps }}
@@ -53,6 +37,9 @@ jobs:
       primary_version: ${{ steps.build-matrix.outputs.primary_version }}
       unique_versions: ${{ steps.build-matrix.outputs.unique_versions }}
     steps:
+      - name: Guard branch
+        uses: HerodotusDev/cicd/.github/actions/guard-branch@main
+
       - name: Checkout caller repo
         uses: HerodotusDev/cicd/.github/actions/checkout-repo@main
         with:
@@ -74,97 +61,9 @@ jobs:
           default_version_file: ${{ env.version_file }}
           default_version_key: ${{ env.version_key }}
 
-  build-and-push-image:
-    needs: [define-matrix]
-    runs-on: ${{ matrix.arch == 'arm64' && 'ubuntu-24.04-arm' || 'ubuntu-latest' }}
-    # One WG peer per repo: builds that pull etcd config use the tunnel and
-    # tunnels must not overlap (WireGuard moves the session on every
-    # handshake). max-parallel takes a literal number — no expressions — so
-    # builds serialize unconditionally; parallel strategy is for small app
-    # counts, the monorepo-sized case is what sequential mode is for.
-    strategy:
-      max-parallel: 1
-      matrix:
-        arch: [amd64, arm64]
-        app: ${{ fromJson(needs.define-matrix.outputs.matrix_deploy) }}
-    steps:
-      # Per-app platforms opt-out (cicd-inputs): skip arch jobs the app
-      # excludes. Job-level `if` cannot see `matrix`, so gate via step output.
-      - id: gate
-        run: |
-          if [[ "${{ inputs.build-strategy }}" == "sequential" ]]; then
-            echo "run=false" >> "$GITHUB_OUTPUT"; exit 0
-          fi
-          platforms="${{ matrix.app.platforms || 'linux/amd64,linux/arm64' }}"
-          if [[ "${platforms}" == *"linux/${{ matrix.arch }}"* ]]; then
-            echo "run=true" >> "$GITHUB_OUTPUT"
-          else
-            echo "run=false" >> "$GITHUB_OUTPUT"
-            echo "${{ matrix.app.name }}: platforms '${platforms}' exclude linux/${{ matrix.arch }} — skipping."
-          fi
-        shell: bash
-
-      - name: Checkout caller repo
-        if: steps.gate.outputs.run == 'true'
-        uses: HerodotusDev/cicd/.github/actions/checkout-repo@main
-        with:
-          token: ${{ secrets.SUBMODULES_PAT || secrets.GITHUB_TOKEN }}
-          submodules: ${{ inputs.submodules }}
-
-      - name: Load Inputs from YAML
-        id: load-inputs
-        if: steps.gate.outputs.run == 'true'
-        uses: HerodotusDev/cicd/.github/actions/load-inputs@main
-        with:
-          inputs_file: ${{ env.inputs_files }}
-
-      - name: Cluster access (etcd over tunnel)
-        if: steps.gate.outputs.run == 'true' && matrix.app.etcd_build_env == true
-        uses: HerodotusDev/cicd/.github/actions/cluster-access@main
-        with:
-          wg_config: ${{ secrets.WG_CONFIG }}
-          deployer_kubeconfig: ${{ secrets.DEPLOYER_KUBECONFIG }}
-          namespace: ${{ env.namespace }}
-          etcd_forward: true
-
-      - name: Pull build-time .env from ETCD
-        id: build-env
-        if: steps.gate.outputs.run == 'true' && matrix.app.etcd_build_env == true
-        uses: HerodotusDev/cicd/.github/actions/pull-etcd-build-env@main
-        with:
-          namespace: ${{ env.namespace }}
-          app_name: ${{ matrix.app.etcd_name || matrix.app.name }}
-          etcd_root: ${{ env.etcd_root || env.repo_name }}
-          etcd_user: ${{ env.ETCD_USER }}
-          etcd_password: ${{ env.ETCD_PASSWORD }}
-          k8s_env: ${{ env.k8s_env }}
-
-      - name: Build and push image
-        if: steps.gate.outputs.run == 'true'
-        uses: HerodotusDev/cicd/.github/actions/build-and-push-image@main
-        with:
-          registry: ${{ env.registry }}
-          registry_host: ${{ env.registry_host }}
-          app_name: ${{ matrix.app.name }}
-          image_suffix: ${{ env.image_suffix }}
-          version: ${{ fromJson(needs.define-matrix.outputs.app_versions)[matrix.app.name] }}
-          registry_username: ${{ github.actor }}
-          registry_password: ${{ github.token }}
-          dockerfile: ${{ matrix.app.dockerfile }}
-          context: ${{ matrix.app.context }}
-          checkout_token: ${{ secrets.SUBMODULES_PAT }}
-          submodules: ${{ inputs.submodules }}
-          build_env_file: ${{ steps.build-env.outputs.env_file }}
-          cache_mode: ${{ matrix.app.cache_mode || 'max' }}
-          cache_scope: ${{ matrix.app.cache_scope || '' }}
-          platforms: ${{ format('linux/{0}', matrix.arch) }}
-
-  build-and-push-image-sequential:
-    if: inputs.build-strategy == 'sequential'
-    needs: [define-matrix]
-    # One job per arch: each platform compiles with the runner's full cores
-    # under its own per-arch cache scope (sharing one job made the platforms
-    # contend for 2 cores and pushed cold builds past the job limit).
+  build:
+    name: build (${{ matrix.arch }})
+    needs: [prep]
     runs-on: ${{ matrix.arch == 'arm64' && 'ubuntu-24.04-arm' || 'ubuntu-latest' }}
     timeout-minutes: 355
     strategy:
@@ -183,10 +82,13 @@ jobs:
         with:
           inputs_file: ${{ env.inputs_files }}
 
+      # One WG peer per repo: only open the tunnel when an app actually pulls
+      # build-time env from etcd (tunnels must not overlap — WireGuard moves
+      # the session on every handshake, so a repo's peer serves one job).
       - name: Detect etcd build-env apps
         id: detect-etcd
         run: |
-          needs_etcd=$(printf '%s' '${{ needs.define-matrix.outputs.matrix_deploy }}' | jq '[.[] | select((.etcd_build_env // false) == true)] | length > 0')
+          needs_etcd=$(printf '%s' '${{ needs.prep.outputs.matrix_deploy }}' | jq '[.[] | select((.etcd_build_env // false) == true)] | length > 0')
           echo "needs_etcd=${needs_etcd}" >> "$GITHUB_OUTPUT"
         shell: bash
 
@@ -199,18 +101,18 @@ jobs:
           namespace: ${{ env.namespace }}
           etcd_forward: true
 
-      - name: Build and push all images sequentially
-        uses: HerodotusDev/cicd/.github/actions/build-and-push-image-sequential@main
+      - name: Build and push all images (parallel, shared cache)
+        uses: HerodotusDev/cicd/.github/actions/build-and-push-images@main
         with:
           registry: ${{ env.registry }}
           registry_host: ${{ env.registry_host }}
           image_suffix: ${{ env.image_suffix }}
-          matrix_deploy: ${{ needs.define-matrix.outputs.matrix_deploy }}
-          app_versions: ${{ needs.define-matrix.outputs.app_versions }}
+          matrix_deploy: ${{ needs.prep.outputs.matrix_deploy }}
+          matrix_init: ${{ needs.prep.outputs.matrix_init }}
+          app_versions: ${{ needs.prep.outputs.app_versions }}
+          primary_version: ${{ needs.prep.outputs.primary_version }}
           registry_username: ${{ github.actor }}
           registry_password: ${{ github.token }}
-          checkout_token: ${{ secrets.SUBMODULES_PAT }}
-          submodules: ${{ inputs.submodules }}
           namespace: ${{ env.namespace }}
           etcd_root: ${{ env.etcd_root || env.repo_name }}
           etcd_user: ${{ env.ETCD_USER }}
@@ -218,76 +120,16 @@ jobs:
           k8s_env: ${{ env.k8s_env }}
           platforms: ${{ format('linux/{0}', matrix.arch) }}
 
-  build-and-push-init:
-    needs: [define-matrix]
-    runs-on: ${{ matrix.arch == 'arm64' && 'ubuntu-24.04-arm' || 'ubuntu-latest' }}
-    strategy:
-      matrix:
-        arch: [amd64, arm64]
-        app: ${{ fromJson(needs.define-matrix.outputs.matrix_init) }}
-    steps:
-      # Job-level `if` cannot see `matrix`; gate everything on one step output.
-      - id: gate
-        run: |
-          name="${{ matrix.app.name }}"
-          image="${{ matrix.app.image || matrix.app.name }}"
-          platforms="${{ matrix.app.platforms || 'linux/amd64,linux/arm64' }}"
-          if [[ "${name}" == "__no_init__" ]]; then
-            echo "No init apps requested. Skipping build-and-push-init job."
-          elif [[ "${image}" != "${name}" ]]; then
-            echo "Init pod ${name} reuses image from ${image}. Skipping build."
-          elif [[ "${platforms}" != *"linux/${{ matrix.arch }}"* ]]; then
-            echo "${name}: platforms '${platforms}' exclude linux/${{ matrix.arch }} — skipping."
-          else
-            echo "run=true" >> "$GITHUB_OUTPUT"
-            exit 0
-          fi
-          echo "run=false" >> "$GITHUB_OUTPUT"
-        shell: bash
-
-      - name: Checkout caller repo
-        if: steps.gate.outputs.run == 'true'
-        uses: HerodotusDev/cicd/.github/actions/checkout-repo@main
-        with:
-          token: ${{ secrets.SUBMODULES_PAT || secrets.GITHUB_TOKEN }}
-          submodules: ${{ inputs.submodules }}
-
-      - name: Load Inputs from YAML
-        id: load-init-inputs
-        if: steps.gate.outputs.run == 'true'
-        uses: HerodotusDev/cicd/.github/actions/load-inputs@main
-        with:
-          inputs_file: ${{ env.inputs_files }}
-
-      - name: Build and push init image
-        if: steps.gate.outputs.run == 'true'
-        uses: HerodotusDev/cicd/.github/actions/build-and-push-image@main
-        with:
-          registry: ${{ env.registry }}
-          registry_host: ${{ env.registry_host }}
-          app_name: ${{ matrix.app.name }}
-          image_suffix: ${{ env.image_suffix }}
-          version: ${{ needs.define-matrix.outputs.primary_version }}
-          registry_username: ${{ github.actor }}
-          registry_password: ${{ github.token }}
-          dockerfile: ${{ matrix.app.dockerfile }}
-          checkout_token: ${{ secrets.SUBMODULES_PAT }}
-          submodules: ${{ inputs.submodules }}
-          cache_mode: ${{ matrix.app.cache_mode || 'max' }}
-          cache_scope: ${{ matrix.app.cache_scope || '' }}
-          platforms: ${{ format('linux/{0}', matrix.arch) }}
-
-  merge-manifests:
-    needs: [define-matrix, build-and-push-image, build-and-push-image-sequential, build-and-push-init]
-    if: ${{ !cancelled() && needs.define-matrix.result == 'success' && (needs.build-and-push-image.result == 'success' || needs.build-and-push-image-sequential.result == 'success') && needs.build-and-push-init.result == 'success' }}
+  finalize:
+    name: finalize (merge + tag + deploy)
+    needs: [prep, build]
     runs-on: ubuntu-latest
     steps:
-      # env.image_suffix / env.k8s_env are job-scoped (set by load-inputs in
-      # the build jobs); the merge job needs its own load to see them.
       - name: Checkout caller repo
         uses: HerodotusDev/cicd/.github/actions/checkout-repo@main
         with:
           token: ${{ secrets.SUBMODULES_PAT || secrets.GITHUB_TOKEN }}
+          submodules: ${{ inputs.submodules }}
 
       - name: Load Inputs from YAML
         id: load-inputs
@@ -301,110 +143,21 @@ jobs:
           registry: ${{ env.registry }}
           registry_host: ${{ env.registry_host }}
           image_suffix: ${{ env.image_suffix }}
-          matrix_deploy: ${{ needs.define-matrix.outputs.matrix_deploy }}
-          matrix_init: ${{ needs.define-matrix.outputs.matrix_init }}
-          app_versions: ${{ needs.define-matrix.outputs.app_versions }}
+          matrix_deploy: ${{ needs.prep.outputs.matrix_deploy }}
+          matrix_init: ${{ needs.prep.outputs.matrix_init }}
+          app_versions: ${{ needs.prep.outputs.app_versions }}
           registry_username: ${{ github.actor }}
           registry_password: ${{ github.token }}
-
-  create-git-tag:
-    needs: [define-matrix, merge-manifests]
-    if: ${{ !cancelled() && needs.define-matrix.result == 'success' && needs.merge-manifests.result == 'success' }}
-    runs-on: ubuntu-latest
-    steps:
-      - name: Checkout caller repo
-        uses: HerodotusDev/cicd/.github/actions/checkout-repo@main
-        with:
-          token: ${{ secrets.SUBMODULES_PAT || secrets.GITHUB_TOKEN }}
-          submodules: ${{ inputs.submodules }}
-
-      - name: Load Inputs from YAML
-        id: load-inputs
-        uses: HerodotusDev/cicd/.github/actions/load-inputs@main
-        with:
-          inputs_file: ${{ env.inputs_files }}
 
       - name: Create Git tag
         uses: HerodotusDev/cicd/.github/actions/create-git-tag@main
         with:
-          tag: ${{ needs.define-matrix.outputs.primary_version }}
+          tag: ${{ needs.prep.outputs.primary_version }}
           token: ${{ secrets.GITHUB_TOKEN }}
 
-  deploy-init-pods:
-    needs: [define-matrix, create-git-tag, merge-manifests]
-    if: ${{ !cancelled() && needs.define-matrix.result == 'success' && needs.create-git-tag.result == 'success' && needs.merge-manifests.result == 'success' }}
-    runs-on: ubuntu-latest
-    # One WG peer per org: tunnel sessions must not overlap (WireGuard moves
-    # the session on every handshake), so tunnel-using matrix jobs run serially.
-    strategy:
-      max-parallel: 1
-      matrix:
-        app: ${{ fromJson(needs.define-matrix.outputs.matrix_init) }}
-    steps:
-      - name: Skip deploy init pods
-        if: ${{ matrix.app.name == '__no_init__' }}
-        run: echo "No init pods requested. Skipping deploy-init-pods job."
-
+      # Single tunnel for the whole deploy: one WG peer per repo, one etcd
+      # port-forward — all app deploys below share them in parallel.
       - name: Cluster access
-        if: ${{ matrix.app.name != '__no_init__' }}
-        uses: HerodotusDev/cicd/.github/actions/cluster-access@main
-        with:
-          wg_config: ${{ secrets.WG_CONFIG }}
-          deployer_kubeconfig: ${{ secrets.DEPLOYER_KUBECONFIG }}
-
-      - name: Checkout caller repo
-        if: ${{ matrix.app.name != '__no_init__' }}
-        uses: HerodotusDev/cicd/.github/actions/checkout-repo@main
-        with:
-          token: ${{ secrets.SUBMODULES_PAT || secrets.GITHUB_TOKEN }}
-          submodules: ${{ inputs.submodules }}
-
-      - name: Load Inputs from YAML
-        id: load-inputs
-        if: ${{ matrix.app.name != '__no_init__' }}
-        uses: HerodotusDev/cicd/.github/actions/load-inputs@main
-        with:
-          inputs_file: ${{ env.inputs_files }}
-
-      - name: Deploy init pod
-        if: ${{ matrix.app.name != '__no_init__' }}
-        uses: HerodotusDev/cicd/.github/actions/deploy-init-to-k8s@main
-        with:
-          namespace: ${{ env.namespace }}
-          pod_manifest: ./k8s/${{ env.k8s_env }}/${{ matrix.app.name }}-pod.yaml
-          rollout_timeout: ${{ env.rollout_timeout }}
-          image_tag: ${{ needs.define-matrix.outputs.primary_version }}
-          image_suffix: ${{ env.image_suffix }}
-          registry: ${{ env.registry }}
-          app_name: ${{ matrix.app.name }}
-          image_name: ${{ matrix.app.image }}
-
-  deploy:
-    needs: [define-matrix, create-git-tag, merge-manifests]
-    if: ${{ !cancelled() && needs.define-matrix.result == 'success' && needs.create-git-tag.result == 'success' && needs.merge-manifests.result == 'success' }}
-    runs-on: ubuntu-latest
-    # One WG peer per org: tunnel sessions must not overlap (WireGuard moves
-    # the session on every handshake), so tunnel-using matrix jobs run serially.
-    strategy:
-      max-parallel: 1
-      matrix:
-        app: ${{ fromJson(needs.define-matrix.outputs.matrix_deploy) }}
-    outputs:
-      config_changed: ${{ steps.pull_config.outputs.config_changed == 'true' || steps.ensure_configmap.outputs.config_changed == 'true' }}
-    steps:
-      - name: Checkout caller repo
-        uses: HerodotusDev/cicd/.github/actions/checkout-repo@main
-        with:
-          token: ${{ secrets.SUBMODULES_PAT || secrets.GITHUB_TOKEN }}
-          submodules: ${{ inputs.submodules }}
-
-      - name: Load Inputs from YAML
-        id: load-inputs
-        uses: HerodotusDev/cicd/.github/actions/load-inputs@main
-        with:
-          inputs_file: ${{ env.inputs_files }}
-
-      - name: Cluster access (etcd over tunnel)
         uses: HerodotusDev/cicd/.github/actions/cluster-access@main
         with:
           wg_config: ${{ secrets.WG_CONFIG }}
@@ -412,34 +165,18 @@ jobs:
           namespace: ${{ env.namespace }}
           etcd_forward: true
 
-      - name: Ensure ConfigMap from files
-        id: ensure_configmap
-        uses: HerodotusDev/cicd/.github/actions/create-configmap@main
+      - name: Deploy init pods + all apps (parallel)
+        uses: HerodotusDev/cicd/.github/actions/deploy-all-to-k8s@main
         with:
           namespace: ${{ env.namespace }}
-          app_name: ${{ matrix.app.name }}
           k8s_env: ${{ env.k8s_env }}
-
-      - name: Pull config from etcd
-        id: pull_config
-        uses: HerodotusDev/cicd/.github/actions/pull-etcd-config@main
-        with:
-          namespace: ${{ env.namespace }}
-          app_name: ${{ matrix.app.etcd_name }}
+          matrix_deploy: ${{ needs.prep.outputs.matrix_deploy }}
+          matrix_init: ${{ needs.prep.outputs.matrix_init }}
+          app_versions: ${{ needs.prep.outputs.app_versions }}
+          primary_version: ${{ needs.prep.outputs.primary_version }}
+          registry: ${{ env.registry }}
+          image_suffix: ${{ env.image_suffix }}
+          rollout_timeout: ${{ env.rollout_timeout }}
+          etcd_root: ${{ env.etcd_root || env.repo_name }}
           etcd_user: ${{ env.ETCD_USER }}
           etcd_password: ${{ env.ETCD_PASSWORD }}
-          etcd_root: ${{ env.etcd_root || env.repo_name }}
-          k8s_env: ${{ env.k8s_env }}
-
-      - name: Deploy to Kubernetes
-        uses: HerodotusDev/cicd/.github/actions/deploy-to-k8s@main
-        with:
-          namespace: ${{ env.namespace }}
-          deployment_file: ./k8s/${{ env.k8s_env }}/${{ matrix.app.manifest_name }}-deployment.yaml
-          ingress_file: ./k8s/${{ env.k8s_env }}/${{ matrix.app.manifest_name }}-ingress.yaml
-          rollout_timeout: ${{ env.rollout_timeout }}
-          image_tag: ${{ fromJson(needs.define-matrix.outputs.app_versions)[matrix.app.name] }}
-          image_suffix: ${{ env.image_suffix }}
-          registry: ${{ env.registry }}
-          app_name: ${{ matrix.app.name }}
-          config_changed: ${{ steps.pull_config.outputs.config_changed == 'true' || steps.ensure_configmap.outputs.config_changed == 'true' }}
