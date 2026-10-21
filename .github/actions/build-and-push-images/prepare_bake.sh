@@ -130,9 +130,12 @@ while IFS= read -r app; do
   ctx="${context}"
   if [[ "${etcd_build_env}" == "true" ]]; then
     # workspace-relative: the daemon resolves target paths inside the
-    # transferred local context
+    # transferred local context. .buildctx lives inside the workspace (next to
+    # a "." context), so exclude it from the copy to avoid cp-ing a directory
+    # into itself.
     rm -rf "${ctx_root}/${name}"
-    cp -a "${context}" "${ctx_root}/${name}"
+    mkdir -p "${ctx_root}/${name}"
+    tar -C "${context}" --exclude='./.buildctx' -cf - . | tar -C "${ctx_root}/${name}" -xf -
     ctx=".buildctx/${name}"
     if [[ -s "${env_dir}/${name}.env" ]]; then
       cp "${env_dir}/${name}.env" "${ctx}/.env.production"
