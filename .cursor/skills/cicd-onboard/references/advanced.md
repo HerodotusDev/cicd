@@ -53,9 +53,10 @@ kubectl/etcd-touching job):
 - etcd credentials are read at deploy time from the in-namespace `daloc-etcd`
   secret and exported as `ETCD_USER`/`ETCD_PASSWORD` for that job only; nothing
   etcd-related is stored in GitHub.
-- There is exactly one tunnel per job: `build` opens it only when an app pulls
-  build-time env from etcd; `finalize` opens it once and all app deploys run
-  in parallel through it, so a repo never clashes with itself.
+- There is exactly one tunnel per job that needs it: `prep` opens it only when
+  an app pulls build-time env from etcd (pulled once, handed to the build jobs
+  as a payload); `finalize` opens it once and all app deploys run in parallel
+  through it, so a repo never clashes with itself.
 
 ## Build-skip & tagging (the parts not covered elsewhere)
 

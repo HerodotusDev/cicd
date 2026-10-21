@@ -36,6 +36,7 @@ jobs:
       app_versions: ${{ steps.build-matrix.outputs.app_versions }}
       primary_version: ${{ steps.build-matrix.outputs.primary_version }}
       unique_versions: ${{ steps.build-matrix.outputs.unique_versions }}
+      build_env_payload: ${{ steps.pull-build-env.outputs.build_env_payload }}
     steps:
       - name: Guard branch
         uses: HerodotusDev/cicd/.github/actions/guard-branch@main
@@ -61,6 +62,79 @@ jobs:
           default_version_file: ${{ env.version_file }}
           default_version_key: ${{ env.version_key }}
 
+      # Build-time env is pulled ONCE here, over this job's tunnel, and handed
+      # to the build jobs as a base64 payload. The per-repo WG peer serves one
+      # tunnel at a time, so the parallel arch build jobs must never open it
+      # themselves.
+      - name: Detect etcd build-env apps
+        id: detect-etcd
+        run: |
+          needs_etcd=$(printf '%s' '${{ steps.build-matrix.outputs.matrix_deploy }}' | jq '[.[] | select((.etcd_build_env // false) == true)] | length > 0')
+          echo "needs_etcd=${needs_etcd}" >> "$GITHUB_OUTPUT"
+        shell: bash
+
+      - name: Cluster access (etcd over tunnel)
+        if: steps.detect-etcd.outputs.needs_etcd == 'true'
+        uses: HerodotusDev/cicd/.github/actions/cluster-access@main
+        with:
+          wg_config: ${{ secrets.WG_CONFIG }}
+          deployer_kubeconfig: ${{ secrets.DEPLOYER_KUBECONFIG }}
+          namespace: ${{ env.namespace }}
+          etcd_forward: true
+
+      - name: Pull build-time .env from ETCD
+        id: pull-build-env
+        if: steps.detect-etcd.outputs.needs_etcd == 'true'
+        env:
+          MATRIX_DEPLOY: ${{ steps.build-matrix.outputs.matrix_deploy }}
+        run: |
+          set -euo pipefail
+          payload='{}'
+          while IFS= read -r app; do
+            [[ -z "${app}" ]] && continue
+            name=$(jq -r '.name' <<<"${app}")
+            etcd_name=$(jq -r '.etcd_name // .name' <<<"${app}")
+            out="${RUNNER_TEMP}/${name}.env"
+            rm -f "${out}"
+            ETCD_HOST="http://127.0.0.1:2379" \
+            ETCD_USER="${{ env.ETCD_USER }}" \
+            ETCD_PASSWORD="${{ env.ETCD_PASSWORD }}" \
+            ETCD_KEY="/${{ env.etcd_root || env.repo_name }}/${{ env.k8s_env }}/${etcd_name}/.env" \
+            APP_NAME="${etcd_name}" \
+            NAMESPACE="${{ env.namespace }}" \
+            OUTPUT_FILE="${RUNNER_TEMP}/${name}.secret.yaml" \
+            bash "${{ github.action_path }}/../etcd-pull/pull.sh" || true
+            if [[ -s "${RUNNER_TEMP}/${name}.secret.yaml" ]]; then
+              in_data=false
+              : > "${out}"
+              while IFS= read -r line; do
+                if [[ "${line}" == "data:" ]]; then in_data=true; continue; fi
+                if ${in_data}; then
+                  if [[ "${line}" =~ ^[[:space:]]+([^:]+):[[:space:]]+(.+)$ ]]; then
+                    echo "${BASH_REMATCH[1]}=$(echo "${BASH_REMATCH[2]}" | base64 -d 2>/dev/null || echo "${BASH_REMATCH[2]}")" >> "${out}"
+                  elif [[ ! "${line}" =~ ^[[:space:]] ]]; then
+                    break
+                  fi
+                fi
+              done < "${RUNNER_TEMP}/${name}.secret.yaml"
+              rm -f "${RUNNER_TEMP}/${name}.secret.yaml"
+            fi
+            if [[ -s "${out}" ]]; then
+              echo "${name}: pulled $(wc -l < "${out}") lines of build-time env"
+            else
+              echo "::warning::No .env at /${{ env.etcd_root || env.repo_name }}/${{ env.k8s_env }}/${etcd_name}/.env — ${name} builds without it"
+            fi
+            payload=$(jq -cn --arg n "${name}" --arg v "$(base64 -w0 "${out}" 2>/dev/null || echo '')" '${payload} + {($n): $v}')
+            rm -f "${out}"
+          done < <(jq -c '.[] | select((.etcd_build_env // false) == true)' <<<"${MATRIX_DEPLOY}")
+          size=$(jq -r '[.[] | length] | add // 0' <<<"${payload}")
+          if (( size > 400000 )); then
+            echo "::error::Build-env payload too large for step outputs (${size} base64 chars) — reduce etcd build-env keys."
+            exit 1
+          fi
+          echo "build_env_payload=$(jq -c . <<<"${payload}")" >> "$GITHUB_OUTPUT"
+        shell: bash
+
   build:
     name: build (${{ matrix.arch }})
     needs: [prep]
@@ -82,25 +156,6 @@ jobs:
         with:
           inputs_file: ${{ env.inputs_files }}
 
-      # One WG peer per repo: only open the tunnel when an app actually pulls
-      # build-time env from etcd (tunnels must not overlap — WireGuard moves
-      # the session on every handshake, so a repo's peer serves one job).
-      - name: Detect etcd build-env apps
-        id: detect-etcd
-        run: |
-          needs_etcd=$(printf '%s' '${{ needs.prep.outputs.matrix_deploy }}' | jq '[.[] | select((.etcd_build_env // false) == true)] | length > 0')
-          echo "needs_etcd=${needs_etcd}" >> "$GITHUB_OUTPUT"
-        shell: bash
-
-      - name: Cluster access (etcd over tunnel)
-        if: steps.detect-etcd.outputs.needs_etcd == 'true'
-        uses: HerodotusDev/cicd/.github/actions/cluster-access@main
-        with:
-          wg_config: ${{ secrets.WG_CONFIG }}
-          deployer_kubeconfig: ${{ secrets.DEPLOYER_KUBECONFIG }}
-          namespace: ${{ env.namespace }}
-          etcd_forward: true
-
       - name: Build and push all images (parallel, shared cache)
         uses: HerodotusDev/cicd/.github/actions/build-and-push-images@main
         with:
@@ -111,12 +166,9 @@ jobs:
           matrix_init: ${{ needs.prep.outputs.matrix_init }}
           app_versions: ${{ needs.prep.outputs.app_versions }}
           primary_version: ${{ needs.prep.outputs.primary_version }}
+          build_env_payload: ${{ needs.prep.outputs.build_env_payload }}
           registry_username: ${{ github.actor }}
           registry_password: ${{ github.token }}
-          namespace: ${{ env.namespace }}
-          etcd_root: ${{ env.etcd_root || env.repo_name }}
-          etcd_user: ${{ env.ETCD_USER }}
-          etcd_password: ${{ env.ETCD_PASSWORD }}
           k8s_env: ${{ env.k8s_env }}
           platforms: ${{ format('linux/{0}', matrix.arch) }}
 

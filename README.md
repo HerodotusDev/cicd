@@ -26,7 +26,11 @@ Both are org secrets shared by consumer repos. **WireGuard peers are one session
 
 - **Org secret `WG_CONFIG`** holds the default peer (used by the cicd smoke workflow).
 - **Repos that deploy get their own peer + a repo-level `WG_CONFIG` secret** (repo secrets shadow org secrets): `daloc-deployer-monorepo`, `daloc-deployer-frontend-new`, `daloc-deployer-k8s`, … Create the OPNsense peer, put its config in the repo secret. With per-repo peers, two repos deploying at the same time is harmless — different keys, independent tunnels.
-- Inside one repo, there is exactly **one tunnel per job**: the `build` job opens it only when an app pulls build-time env from etcd, and the `finalize` job opens it once for the whole deploy — all apps deploy in parallel through that single tunnel, so a repo can't clash with itself.
+- Inside one repo, there is exactly **one tunnel per job that needs it**: `prep`
+  opens it only when an app pulls build-time env from etcd (the payload is then
+  handed to the build jobs), and `finalize` opens it once for the whole deploy —
+  all apps deploy in parallel through that single tunnel, so a repo can't clash
+  with itself.
 
 The pipeline logs in to ghcr with the caller's `GITHUB_TOKEN` — consumer workflows need `packages: write`. etcd credentials are read at deploy time from the in-namespace `daloc-etcd` secret; no etcd secret lives in GitHub.
 
@@ -61,7 +65,7 @@ Once installed, ask the agent to onboard the repo and it follows the skill.
 
 Three jobs, four runner spawns total:
 
-1. `prep` — branch guard, inputs, version resolution, app matrix.
+1. `prep` — branch guard, inputs, version resolution, app matrix, and the etcd build-time env pull (only when an app declares `etcd_build_env`).
 2. `build` — one job per arch (`ubuntu-latest` / native `ubuntu-24.04-arm`); all apps build **in parallel inside the job** against one buildx daemon. Apps share the same Dockerfile DAG (per-app `APP_NAME` only affects the runtime stage), so BuildKit computes shared compile vertices once and fans the thin runtime stages out concurrently.
 3. `finalize` — merges per-arch tags into manifest lists, creates the version tag, opens the cluster tunnel once, then deploys init pods + all apps **in parallel** (bounded by `deploy_concurrency`, default 5) sharing that single tunnel + etcd port-forward.
 

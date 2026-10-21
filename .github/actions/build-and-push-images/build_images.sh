@@ -12,7 +12,7 @@
 # name. Arch is always appended so the two platform jobs never evict each
 # other from the GHA cache bucket.
 #
-# Per-app behavior (tag-exists skip, repo overrides, etcd build-env pull,
+# Per-app behavior (tag-exists skip, repo overrides, build-env injection,
 # cache args, APP_NAME build-arg) mirrors the older per-app composite in
 # ../build-and-push-image — that action remains for prewarm workflows that
 # call it directly; keep the two in sync.
@@ -24,14 +24,15 @@ set -euo pipefail
 IMAGE_SUFFIX="${IMAGE_SUFFIX:-}"
 MATRIX_INIT="${MATRIX_INIT:-[]}"
 PRIMARY_VERSION="${PRIMARY_VERSION:-}"
-NAMESPACE="${NAMESPACE:-}"
-ETCD_ROOT="${ETCD_ROOT:-}"
-ETCD_USER="${ETCD_USER:-}"
-ETCD_PASSWORD="${ETCD_PASSWORD:-}"
+BUILD_ENV_PAYLOAD="${BUILD_ENV_PAYLOAD:-}"
 K8S_ENV="${K8S_ENV:-}"
 BUILD_CONCURRENCY="${build_concurrency:-6}"
 REPO_CACHE_SCOPE="${cache_scope:-}"
 REPO="${GITHUB_REPOSITORY}"
+
+if [[ -z "${BUILD_ENV_PAYLOAD}" ]]; then
+  BUILD_ENV_PAYLOAD='{}'
+fi
 
 case "${PLATFORMS}" in
   linux/amd64) arch="amd64" ;;
@@ -44,11 +45,20 @@ for tool in jq yq docker; do
 done
 
 overrides_file="${GITHUB_ACTION_PATH}/../resolve-overrides/overrides.yaml"
-default_etcd_host="http://etcd.etcd.svc.cluster.local:2379"
-etcd_pull="${GITHUB_ACTION_PATH}/../etcd-pull/pull.sh"
 env_dir="${RUNNER_TEMP:-/tmp}/build-env"
 log_dir="${RUNNER_TEMP:-/tmp}/build-logs"
 mkdir -p "${env_dir}" "${log_dir}"
+
+# Phase A (serial): decode the prep-provided build-env payload into per-app
+# .env files. The etcd pull already happened in prep, over its own tunnel —
+# build jobs never open the repo's WG peer (one peer = one tunnel).
+jq -r 'to_entries[] | "\(.key)\t\(.value)"' <<<"${BUILD_ENV_PAYLOAD}" |
+while IFS=$'\t' read -r name b64; do
+  if [[ -n "${b64}" ]]; then
+    base64 -d <<<"${b64}" > "${env_dir}/${name}.env"
+    echo "${name}: decoded build-time env ($(wc -l < "${env_dir}/${name}.env") lines)"
+  fi
+done
 
 # Apps to build: deploy apps + init apps that own their image (init apps
 # reusing another app's image are covered by that app's build).
@@ -62,64 +72,6 @@ apps_json=$(jq -cn \
      | map(. + {_kind: "init"}))
   | unique_by(.name)')
 count=$(jq 'length' <<<"${apps_json}")
-
-# Phase A (serial): pull etcd build-env for apps that need it. Serial because
-# pull.sh populates a shared etcdctl binary path on first use, and the volume
-# is tiny — parallelizing this phase buys nothing.
-while IFS= read -r app; do
-  [[ -z "${app}" ]] && continue
-  name=$(jq -r '.name' <<<"${app}")
-  etcd_name=$(jq -r '.etcd_name // .name' <<<"${app}")
-
-  ovr_host=$(yq ".etcd_hosts.\"${NAMESPACE}\".host // \"\"" "${overrides_file}")
-  ovr_user=$(yq ".etcd_hosts.\"${NAMESPACE}\".user // \"\"" "${overrides_file}")
-  ovr_password_env=$(yq ".etcd_hosts.\"${NAMESPACE}\".password_env // \"\"" "${overrides_file}")
-  etcd_host="${ovr_host:-${default_etcd_host}}"
-  etcd_user="${ovr_user:-${ETCD_USER}}"
-  etcd_password="${ETCD_PASSWORD}"
-  if [[ -n "${ovr_password_env}" ]]; then
-    etcd_password="${!ovr_password_env:-}"
-  fi
-
-  echo "Fetching etcd build-env: /${ETCD_ROOT}/${K8S_ENV}/${etcd_name}/.env"
-  ETCD_HOST="${etcd_host}" \
-  ETCD_USER="${etcd_user}" \
-  ETCD_PASSWORD="${etcd_password}" \
-  ETCD_KEY="/${ETCD_ROOT}/${K8S_ENV}/${etcd_name}/.env" \
-  APP_NAME="${etcd_name}" \
-  NAMESPACE="${NAMESPACE}" \
-  OUTPUT_FILE="${env_dir}/${name}.secret.yaml" \
-  bash "${etcd_pull}" || true
-
-  if [[ -s "${env_dir}/${name}.secret.yaml" ]]; then
-    # Extract KEY=VALUE lines from the base64 secret data.
-    out="${env_dir}/${name}.env"
-    : > "${out}"
-    in_data=false
-    while IFS= read -r line; do
-      if [[ "${line}" == "data:" ]]; then
-        in_data=true
-        continue
-      fi
-      if ${in_data}; then
-        if [[ "${line}" =~ ^[[:space:]]+([^:]+):[[:space:]]+(.+)$ ]]; then
-          key="${BASH_REMATCH[1]}"
-          val="${BASH_REMATCH[2]}"
-          decoded=$(echo "${val}" | base64 -d 2>/dev/null || echo "${val}")
-          echo "${key}=${decoded}" >> "${out}"
-        elif [[ ! "${line}" =~ ^[[:space:]] ]]; then
-          break
-        fi
-      fi
-    done < "${env_dir}/${name}.secret.yaml"
-    rm -f "${env_dir}/${name}.secret.yaml"
-    if [[ ! -s "${out}" ]]; then
-      echo "::warning::Failed to extract env vars for ${name}"
-    fi
-  else
-    echo "::warning::No .env found at etcd key /${ETCD_ROOT}/${K8S_ENV}/${etcd_name}/.env — ${name} builds without it"
-  fi
-done < <(jq -c '.[] | select((.etcd_build_env // false) == true)' <<<"${apps_json}")
 
 # Phase B (parallel): one buildx build per app.
 build_one() {
@@ -211,7 +163,7 @@ build_one() {
   echo "✅ ${name}: pushed ${arch_tag} ($((t1 - t0))s)"
 }
 
-export REGISTRY IMAGE_SUFFIX APP_VERSIONS PRIMARY_VERSION PLATFORMS NAMESPACE K8S_ENV \
+export REGISTRY IMAGE_SUFFIX APP_VERSIONS PRIMARY_VERSION PLATFORMS K8S_ENV \
   REPO REPO_CACHE_SCOPE overrides_file env_dir log_dir arch
 
 echo "Parallel build: ${count} app(s), platform ${PLATFORMS}, concurrency ${BUILD_CONCURRENCY}."

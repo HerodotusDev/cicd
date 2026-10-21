@@ -33,29 +33,20 @@ inputs:
     description: "Version used for init apps (prep primary_version output)."
     required: false
     default: ""
+  build_env_payload:
+    description: "JSON map of app name → base64 build-time .env (pulled once in prep over the tunnel). Empty when no app needs build-time env."
+    required: false
+    default: "{}"
   registry_username:
     description: "Registry login (github.actor for ghcr)."
     required: true
   registry_password:
     description: "Registry password (github.token for ghcr; needs packages:write)."
     required: true
-  namespace:
-    description: "Kubernetes namespace (post -stg/-prod rewrite; used to resolve etcd host)."
-    required: true
-  etcd_root:
-    description: "ETCD root path for build-env keys."
-    required: true
-  etcd_user:
-    description: "ETCD username (exported by the cluster-access etcd forward)."
-    required: false
-    default: ""
-  etcd_password:
-    description: "ETCD password (exported by the cluster-access etcd forward)."
-    required: false
-    default: ""
   k8s_env:
-    description: "Kubernetes environment (stg / prod)."
-    required: true
+    description: "Kubernetes environment (stg / prod). Unused by the build itself; kept for log context."
+    required: false
+    default: ""
   platforms:
     description: "Single buildx platform this job builds (linux/amd64 or linux/arm64). The workflow runs one job per arch on a matching runner; a merge step assembles the manifest list. Per-app platforms in cicd-inputs can exclude an arch."
     required: false
@@ -85,10 +76,7 @@ runs:
         MATRIX_INIT: ${{ inputs.matrix_init }}
         APP_VERSIONS: ${{ inputs.app_versions }}
         PRIMARY_VERSION: ${{ inputs.primary_version }}
-        NAMESPACE: ${{ inputs.namespace }}
-        ETCD_ROOT: ${{ inputs.etcd_root }}
-        ETCD_USER: ${{ inputs.etcd_user }}
-        ETCD_PASSWORD: ${{ inputs.etcd_password }}
+        BUILD_ENV_PAYLOAD: ${{ inputs.build_env_payload }}
         K8S_ENV: ${{ inputs.k8s_env }}
         PLATFORMS: ${{ inputs.platforms }}
       run: |
