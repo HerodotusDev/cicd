@@ -51,10 +51,9 @@ done
 overrides_file="${GITHUB_ACTION_PATH}/../resolve-overrides/overrides.yaml"
 env_dir="${RUNNER_TEMP:-/tmp}/build-env"
 # The bake definition and per-target contexts are resolved by buildkitd
-# daemon-side: they must live inside the workspace (part of the transferred
-# local context), not in RUNNER_TEMP — paths outside it are invisible to the
-# buildkitd container (lstat failure).
-bake_file="${GITHUB_WORKSPACE}/bake-${arch}.json"
+# daemon-side inside the transferred local context: keep everything
+# workspace-relative — absolute host paths don't exist inside the session.
+bake_file="bake-${arch}.json"
 ctx_root="${GITHUB_WORKSPACE}/.buildctx"
 mkdir -p "${env_dir}" "${ctx_root}"
 
