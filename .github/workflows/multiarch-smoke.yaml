@@ -80,7 +80,7 @@ jobs:
           docker buildx build \
             --progress=plain \
             --push \
-            --file .github/smoke/Dockerfile.smoke-multiarch \
+            --file docker/Dockerfile.smoke-multiarch \
             --cache-from "type=gha,scope=raw-probe-amd64" \
             --cache-to "type=gha,mode=max,scope=raw-probe-amd64" \
             --network host \
