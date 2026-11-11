@@ -73,8 +73,8 @@ runs:
           image_suffix="-prod"
         fi
         echo "image_suffix=${image_suffix}" >> $GITHUB_ENV
-        if [ -n "${ETCD_NAMESPACE:-}" ]; then
-          echo "etcd_namespace=${ETCD_NAMESPACE}" >> $GITHUB_ENV
+        if [ -n "${etcd_namespace:-}" ]; then
+          echo "etcd_namespace=${etcd_namespace}" >> $GITHUB_ENV
         else
           echo "etcd_namespace=${{env.namespace}}-prod" >> $GITHUB_ENV
         fi
