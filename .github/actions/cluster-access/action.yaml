@@ -49,8 +49,16 @@ runs:
       shell: bash
       run: |
         if ! command -v wg >/dev/null 2>&1; then
-          sudo apt-get update -qq
-          sudo apt-get install -y -qq wireguard-tools
+          for attempt in 1 2 3 4; do
+            if sudo apt-get update -qq && sudo apt-get install -y -qq wireguard-tools; then
+              break
+            fi
+            # Runner apt mirrors fail with DNS blips more often than one would
+            # like; back off and retry instead of failing the whole deploy.
+            [ "$attempt" = 4 ] && exit 1
+            echo "apt attempt $attempt failed; retrying in 30s"
+            sleep 30
+          done
         fi
         wg --version
 
