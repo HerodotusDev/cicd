@@ -47,6 +47,7 @@ app_names:
 | `cache_scope` | *(default BuildKit scope)* | Optional GHA cache scope key. Set per app so matrix builds do not overwrite each other's cache buckets. |
 | `platforms` | `linux/amd64,linux/arm64` | Architectures built for the image (comma list). The home cluster schedules onto both amd64 (`ms`) and arm64 (RPi) nodes, so images ship as multi-arch manifest lists by default. Restrict with e.g. `platforms: linux/amd64` — excluded arches skip both build and merge. |
 | `deploy_envs` | *(all envs)* | List of environments (`prod`, `stg`) where the app participates. When the current `k8s_env` is not in the list, the app is excluded from the build matrix, deploy matrix, init pods, version computation — everything. Useful for prod-only components (e.g. `deploy_envs: [prod]` for an Arbitrum keeper when staging has no chain). Absent = no behavior change. |
+| `etcd_namespace` | `<namespace>-prod` | Namespace holding the etcd instance (etcd forwards + key reads). Pin it for repos that share another tenant's etcd and have no prod namespace of their own (e.g. `etcd_namespace: daloc-prod` on a staging-only repo whose `namespace` base differs). |
 
 ## Version resolution
 

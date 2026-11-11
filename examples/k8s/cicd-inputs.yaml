@@ -22,6 +22,8 @@ app_names:
     # platforms: linux/amd64,linux/arm64  # optional. defaults to both. restrict with e.g. "linux/amd64".
     # deploy_envs: [prod]              # optional. defaults to all envs. list of envs (prod, stg) where the app
     #                                   #   participates; excluded from build+deploy matrices in every other env.
+    #                                   # top-level alternative: `etcd_namespace:` pins where etcd lives
+    #                                   #   (default <namespace>-prod) — for repos sharing another tenant's etcd.
   - "example2"                      # plain strings pick up all defaults.
 
 
