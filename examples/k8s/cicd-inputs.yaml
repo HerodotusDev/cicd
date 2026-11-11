@@ -20,6 +20,8 @@ app_names:
     # cache_mode: max                # optional. GHA cache export mode (min = final layers only, max = all stages).
     # cache_scope: my-scope          # optional. custom GHA cache scope key.
     # platforms: linux/amd64,linux/arm64  # optional. defaults to both. restrict with e.g. "linux/amd64".
+    # deploy_envs: [prod]              # optional. defaults to all envs. list of envs (prod, stg) where the app
+    #                                   #   participates; excluded from build+deploy matrices in every other env.
   - "example2"                      # plain strings pick up all defaults.
 
 

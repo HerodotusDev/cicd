@@ -17,9 +17,13 @@ inputs:
     description: "Kubeconfig for the daloc-deployer identity (org secret DEPLOYER_KUBECONFIG), pointing at the capsule proxy via the tunnel."
     required: true
   namespace:
-    description: "Namespace holding daloc-etcd (used for the etcd forward + credential read)."
+    description: "Namespace to verify reachability for (kubectl can-i check)."
     required: false
     default: "daloc-prod"
+  etcd_namespace:
+    description: "Namespace holding daloc-etcd (used for the etcd forward + credential read). Defaults to `namespace`. Staging consumers forward etcd from their prod namespace."
+    required: false
+    default: ""
   etcd_forward:
     description: "'true' to port-forward daloc-etcd to 127.0.0.1:2379 and export ETCD_USER/ETCD_PASSWORD."
     required: false
@@ -93,7 +97,10 @@ runs:
       shell: bash
       run: |
         set -euo pipefail
-        ns="${{ inputs.namespace }}"
+        # etcd is read/forwarded from etcd_namespace (defaults to namespace):
+        # staging deploys share the prod etcd instance while deploying into
+        # the staging namespace.
+        ns="${{ inputs.etcd_namespace || inputs.namespace }}"
         password=$(kubectl -n "$ns" get secret "${{ inputs.etcd_secret }}" \
           -o jsonpath='{.data.etcd-root-password}' | base64 -d)
         echo "::add-mask::${password}"

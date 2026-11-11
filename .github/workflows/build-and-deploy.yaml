@@ -61,6 +61,7 @@ jobs:
           app_names: ${{ steps.load-inputs.outputs.app_names }}
           default_version_file: ${{ env.version_file }}
           default_version_key: ${{ env.version_key }}
+          k8s_env: ${{ env.k8s_env }}
 
       # Build-time env is pulled ONCE here, over this job's tunnel, and handed
       # to the build jobs as a base64 payload. The per-repo WG peer serves one
@@ -73,6 +74,7 @@ jobs:
           wg_config: ${{ secrets.WG_CONFIG }}
           deployer_kubeconfig: ${{ secrets.DEPLOYER_KUBECONFIG }}
           namespace: ${{ env.namespace }}
+          etcd_namespace: ${{ env.etcd_namespace || env.namespace }}
           k8s_env: ${{ env.k8s_env }}
           etcd_root: ${{ env.etcd_root || env.repo_name }}
           matrix_deploy: ${{ steps.build-matrix.outputs.matrix_deploy }}
@@ -157,6 +159,7 @@ jobs:
           wg_config: ${{ secrets.WG_CONFIG }}
           deployer_kubeconfig: ${{ secrets.DEPLOYER_KUBECONFIG }}
           namespace: ${{ env.namespace }}
+          etcd_namespace: ${{ env.etcd_namespace || env.namespace }}
           etcd_forward: true
 
       - name: Deploy init pods + all apps (parallel)

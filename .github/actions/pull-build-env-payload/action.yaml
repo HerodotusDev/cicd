@@ -17,8 +17,12 @@ inputs:
     description: "Kubeconfig for the deployer identity, pointing at the capsule proxy via the tunnel."
     required: true
   namespace:
-    description: "Namespace holding daloc-etcd."
+    description: "Namespace being deployed into (used for the reachability check + Secret metadata)."
     required: true
+  etcd_namespace:
+    description: "Namespace holding daloc-etcd (etcd forward + credential read). Defaults to `namespace`. Staging consumers forward etcd from their prod namespace."
+    required: false
+    default: ""
   k8s_env:
     description: "Kubernetes environment (stg / prod) — etcd key segment."
     required: true
@@ -53,6 +57,7 @@ runs:
         wg_config: ${{ inputs.wg_config }}
         deployer_kubeconfig: ${{ inputs.deployer_kubeconfig }}
         namespace: ${{ inputs.namespace }}
+        etcd_namespace: ${{ inputs.etcd_namespace || inputs.namespace }}
         etcd_forward: true
 
     - name: Pull build-time .env and build payload

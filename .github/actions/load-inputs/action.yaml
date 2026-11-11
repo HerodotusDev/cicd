@@ -56,6 +56,10 @@ runs:
         # Consumed downstream as env.k8s_env, env.namespace and env.image_suffix.
         # Namespaces are <inputs namespace>-<env> (e.g. daloc -> daloc-prod) and
         # images carry the same suffix (ghcr.io/herodotusdev/<app>-<env>).
+        # Staging does not host its own etcd: staging consumers share the PROD
+        # etcd instance (keys are still namespaced /<etcd_root>/stg/<app>/.env),
+        # so etcd_namespace always points at the prod namespace of the base.
+        # On main it equals namespace — no behavior change.
         image_suffix="-stg"
         if [ "${GITHUB_REF_NAME}" = "develop" ]; then
           echo "namespace=${{env.namespace}}-stg" >> $GITHUB_ENV
@@ -66,6 +70,7 @@ runs:
           image_suffix="-prod"
         fi
         echo "image_suffix=${image_suffix}" >> $GITHUB_ENV
+        echo "etcd_namespace=${{env.namespace}}-prod" >> $GITHUB_ENV
 
         repo_name=$(basename "$GITHUB_REPOSITORY")
         echo "repo_name=$repo_name" >> $GITHUB_ENV

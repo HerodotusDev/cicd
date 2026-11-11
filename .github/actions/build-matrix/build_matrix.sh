@@ -14,6 +14,8 @@ app_matrix_raw="${APP_MATRIX:-}"
 raw_app_names="${RAW_APP_NAMES:-}"
 default_version_file="${DEFAULT_VERSION_FILE:-./package.json}"
 default_version_key="${DEFAULT_VERSION_KEY:-}"
+# Current environment (stg / prod). Empty = no deploy_envs filtering.
+k8s_env="${K8S_ENV:-}"
 
 tmp_apps=$(mktemp)
 trap 'rm -f "$tmp_apps"' EXIT
@@ -44,6 +46,33 @@ sanitized=$(printf '%s' "$apps_json" | jq -c --arg default_file "$default_versio
     | with_entries(select(.value != null))
   )
 ')
+
+# Per-app env participation filter: apps may declare `deploy_envs` (list of
+# prod / stg); when absent the app participates in every environment. Applied
+# before version resolution and matrix derivation so app_versions,
+# primary_version, unique_versions, matrix_deploy and matrix_init all see the
+# same filtered set. No k8s_env (non-deploy branch) = no filtering.
+active_apps="$sanitized"
+if [[ -n "$k8s_env" ]]; then
+  active_apps=$(printf '%s' "$sanitized" | jq -c --arg env "$k8s_env" '
+    map(select(
+      (.deploy_envs == null)
+      or (
+        ((.deploy_envs // []) | if type == "string" then [.] else . end)
+        | index($env) != null
+      )
+    ))
+  ')
+  filtered_out=$(printf '%s\n' "$sanitized" "$active_apps" \
+    | jq -s -c --arg env "$k8s_env" '.[0] - .[1] | map(.name)')
+  if [[ "$filtered_out" != "[]" ]]; then
+    echo "ℹ️  Apps excluded by deploy_envs for env '${k8s_env}': ${filtered_out}"
+  fi
+  if [[ "$(printf '%s' "$active_apps" | jq 'length')" -eq 0 ]]; then
+    echo "❌ Error: every app is excluded by deploy_envs for env '${k8s_env}'." >&2
+    exit 1
+  fi
+fi
 
 primary_version=""
 declare -a versions_seen=()
@@ -95,7 +124,7 @@ while IFS= read -r app; do
     primary_version="$version"
   fi
 
-done < <(printf '%s' "$sanitized" | jq -c '.[]')
+done < <(printf '%s' "$active_apps" | jq -c '.[]')
 
 matrix_apps=$(jq -cs '.' "$tmp_apps")
 

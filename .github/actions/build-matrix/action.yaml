@@ -16,6 +16,10 @@ inputs:
     description: "Optional dot-path to a nested version field."
     required: false
     default: ""
+  k8s_env:
+    description: "Current environment (stg / prod). Apps declaring `deploy_envs` not containing this value are excluded from all matrices. Empty disables filtering."
+    required: false
+    default: ""
 
 outputs:
   matrix_apps:
@@ -48,6 +52,7 @@ runs:
         RAW_APP_NAMES: ${{ inputs.app_names }}
         DEFAULT_VERSION_FILE: ${{ inputs.default_version_file }}
         DEFAULT_VERSION_KEY: ${{ inputs.default_version_key }}
+        K8S_ENV: ${{ inputs.k8s_env }}
       run: |
         set -euo pipefail
         bash "${GITHUB_ACTION_PATH}/build_matrix.sh"

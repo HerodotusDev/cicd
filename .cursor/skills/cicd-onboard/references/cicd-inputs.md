@@ -46,6 +46,7 @@ app_names:
 | `cache_mode` | `max` | BuildKit GHA cache export mode passed to `cache-to`: `min` (final image layers only) or `max` (all intermediate stages). |
 | `cache_scope` | *(default BuildKit scope)* | Optional GHA cache scope key. Set per app so matrix builds do not overwrite each other's cache buckets. |
 | `platforms` | `linux/amd64,linux/arm64` | Architectures built for the image (comma list). The home cluster schedules onto both amd64 (`ms`) and arm64 (RPi) nodes, so images ship as multi-arch manifest lists by default. Restrict with e.g. `platforms: linux/amd64` — excluded arches skip both build and merge. |
+| `deploy_envs` | *(all envs)* | List of environments (`prod`, `stg`) where the app participates. When the current `k8s_env` is not in the list, the app is excluded from the build matrix, deploy matrix, init pods, version computation — everything. Useful for prod-only components (e.g. `deploy_envs: [prod]` for an Arbitrum keeper when staging has no chain). Absent = no behavior change. |
 
 ## Version resolution
 
@@ -54,7 +55,11 @@ app_names:
 - **JSON** (`package.json`): `version_key` is a dot-path via `jq getpath` (e.g. `package.version`); with no key, reads top-level `.version`.
 - **TOML** (`Cargo.toml`): `version_key`'s last segment is the key and the preceding segments are the `[section]` (e.g. `tool.poetry.version` → key `version` in `[tool.poetry]`); with no key, the **first** `version =` line wins.
 - A missing version file or unresolved version **fails the run**.
-- The **first** app's version is the `primary_version` used for the git tag and for init pods.
+- The **first** app's version (after `deploy_envs` filtering for the current env) is the `primary_version` used for the git tag and for init pods.
+
+## Environments and etcd
+
+`namespace` is rewritten to `<namespace>-prod` on `main`, `<namespace>-stg` on `develop`; `k8s_env` becomes `prod` / `stg`. Staging shares the **prod** etcd instance: the workflow forwards etcd from `<namespace>-prod` (`etcd_namespace`) even while deploying into `<namespace>-stg`, and reads keys at `/<etcd_root>/stg/<app>/.env`. Both namespaces resolve etcd to `127.0.0.1:2379` over the tunnel via the overrides file. Apps that must not deploy to staging set `deploy_envs: [prod]`.
 
 ## Gotchas
 

@@ -16,6 +16,8 @@
 
 Other branches are blocked. Environments are à la carte: wire only the branches you use; create the target namespace (as the tenant owner) before the first deploy.
 
+Staging does not host its own etcd: on `develop` the deploy namespace is `<namespace>-stg`, but etcd is still read/forwarded from `<namespace>-prod` (keys are namespaced `/stg/...`, so prod and stg configs never collide). Apps that must not exist in staging set `deploy_envs: [prod]` in `cicd-inputs.yaml` (see the cicd-inputs reference).
+
 ## Required secrets (org-level defaults, per-repo overrides)
 | Secret | Content |
 |--------|---------|
@@ -78,7 +80,7 @@ Dockerfile requirements: base images (`FROM ...`) must be multi-arch manifests (
 
 ## Etcd configuration
 Upload the configuration file to etcd before the workflow runs. The workflow reads `/etcd_root/k8s_env/app_name/.env` and writes it into `<app_name>-secret`.
-etcd lives in the deploy namespace (`daloc-etcd`); CI reaches it over the WireGuard tunnel via `kubectl port-forward` (the `cluster-access` action sets that up). The secret is mounted into the container and configuration is accessible as system envs.
+etcd lives in the **prod** namespace (`<namespace>-prod/daloc-etcd`); CI reaches it over the WireGuard tunnel via `kubectl port-forward` (the `cluster-access` action sets that up, using `etcd_namespace` — on `develop` the deploy namespace is `<namespace>-stg` but etcd is still forwarded from `<namespace>-prod`, with keys namespaced `/stg/...`). The secret is mounted into the container and configuration is accessible as system envs.
 
 ## ConfigMaps
 If you place files in `k8s/<env>/<app>-configmap/`, they will be pulled into a config map object that can be mounted into the container as files.
