@@ -76,7 +76,12 @@ runs:
         conf="${RUNNER_TEMP}/wg0.conf"
         printf '%s\n' "$WG_CONFIG" > "$conf"
         chmod 600 "$conf"
-        sudo wg-quick up "$conf"
+        # wg-quick under sudo reads the config as root: the runner's _temp dir
+        # is no longer root-traversable on current runner images, so the file
+        # moves into /etc/wireguard (the canonical location) and the interface
+        # comes up by name.
+        sudo install -m 600 "$conf" /etc/wireguard/wg0.conf
+        sudo wg-quick up wg0
 
     - name: Export deployer kubeconfig
       shell: bash
